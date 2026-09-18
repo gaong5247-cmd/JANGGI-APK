@@ -1,0 +1,1 @@
+PASS: Java Engine bridge; 20 alternating legal plies; MultiPV stop; resynchronization; pre-cancelled search.
