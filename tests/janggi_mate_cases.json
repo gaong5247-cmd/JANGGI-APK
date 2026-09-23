@@ -1,0 +1,592 @@
+[
+  {
+    "name": "start_position",
+    "fen": "rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "exactLegalMoves": 32,
+    "mustContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "ordinary_capture_before",
+    "fen": "9/3k5/9/p8/9/9/R8/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "a4a7"
+    ]
+  },
+  {
+    "name": "ordinary_capture_after",
+    "fen": "9/3k5/9/p8/9/9/R8/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "moves": [
+      "a4a7"
+    ],
+    "mustContain": [
+      "d9e9"
+    ]
+  },
+  {
+    "name": "rook_check_king_escape",
+    "fen": "9/3k5/9/9/4r4/9/9/9/4K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "e2d2"
+    ],
+    "mustNotContain": [
+      "e2e2",
+      "e2e3"
+    ]
+  },
+  {
+    "name": "check_capture_attacker",
+    "fen": "9/3k5/9/9/9/9/9/R3r4/4K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "a3e3"
+    ],
+    "mustNotContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "check_interposition",
+    "fen": "9/3k5/9/9/4r4/9/R8/9/4K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "a4e4"
+    ],
+    "mustNotContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "king_captures_unprotected_checker",
+    "fen": "9/3k5/9/9/9/9/9/4r4/4K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "e2e3"
+    ]
+  },
+  {
+    "name": "king_cannot_capture_protected_checker",
+    "fen": "9/3k5/9/9/9/9/9/4r3r/4K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "e2e3"
+    ]
+  },
+  {
+    "name": "king_cannot_enter_attacked_square",
+    "fen": "9/3k5/9/9/3r5/9/9/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "e2d2"
+    ],
+    "mustContain": [
+      "e2f2",
+      "e2e2"
+    ]
+  },
+  {
+    "name": "completed_checkmate",
+    "fen": "9/3k5/9/9/9/9/9/3rrr3/9/4K4 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "loss",
+    "expectedReason": "checkmate",
+    "minimumLegalMoves": 0,
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "one_defence_survives",
+    "fen": "9/3k5/9/9/9/9/4R4/3rrr3/9/4K4 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "e4e3"
+    ],
+    "exactLegalMoves": 1
+  },
+  {
+    "name": "mate_in_one_prediction",
+    "fen": "9/3k5/9/9/9/9/r8/3r1r3/9/4K4 b - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "a4e4"
+    ],
+    "searchMate": true
+  },
+  {
+    "name": "mate_in_one_completed",
+    "fen": "9/3k5/9/9/9/9/r8/3r1r3/9/4K4 b - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "loss",
+    "expectedReason": "checkmate",
+    "minimumLegalMoves": 0,
+    "moves": [
+      "a4e4"
+    ],
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "pass_only_is_not_mate",
+    "fen": "4k4/c7R/9/3R1R3/9/9/9/9/9/3K5 b - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "exactLegalMoves": 1,
+    "mustContain": [
+      "e10e10"
+    ]
+  },
+  {
+    "name": "cannon_check_with_screen",
+    "fen": "9/3k5/9/9/4c4/9/4P4/9/4K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "cannon_no_screen",
+    "fen": "9/3k5/9/9/4c4/9/9/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "cannon_cannon_screen_blocks",
+    "fen": "9/3k5/9/9/4c4/9/4C4/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "cannon_cannot_capture_cannon",
+    "fen": "9/3k5/9/9/9/9/C1P1c4/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "a4e4"
+    ],
+    "mustContain": [
+      "a4d4"
+    ]
+  },
+  {
+    "name": "cannon_can_capture_other_piece",
+    "fen": "9/3k5/9/9/9/9/C1P1p4/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "a4e4"
+    ]
+  },
+  {
+    "name": "cannon_cannot_jump_cannon",
+    "fen": "9/3k5/9/9/9/9/C1c1p4/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "a4e4",
+      "a4d4"
+    ]
+  },
+  {
+    "name": "horse_leg_open",
+    "fen": "9/3k5/9/9/9/9/3n5/9/4K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "horse_leg_blocked",
+    "fen": "9/3k5/9/9/9/9/3n5/3P5/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "elephant_path_open",
+    "fen": "9/3k5/9/9/9/9/1b7/9/4K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "elephant_first_leg_blocked",
+    "fen": "9/3k5/9/9/9/9/1bP6/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "elephant_second_leg_blocked",
+    "fen": "9/3k5/9/9/9/9/1b7/3P5/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "palace_diagonal_rook_check",
+    "fen": "9/3k5/9/9/9/9/9/3r5/9/5K3 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "f1f1"
+    ]
+  },
+  {
+    "name": "palace_diagonal_rook_blocked",
+    "fen": "9/3k5/9/9/9/9/9/3r5/4P4/5K3 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "f1f1"
+    ]
+  },
+  {
+    "name": "palace_diagonal_cannon_check",
+    "fen": "9/3k5/9/9/9/9/9/3c5/4P4/5K3 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "f1f1"
+    ]
+  },
+  {
+    "name": "palace_diagonal_cannon_no_screen",
+    "fen": "9/3k5/9/9/9/9/9/3c5/9/5K3 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "f1f1"
+    ]
+  },
+  {
+    "name": "palace_diagonal_cannon_cannon_screen",
+    "fen": "9/3k5/9/9/9/9/9/3c5/4C4/5K3 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustContain": [
+      "f1f1"
+    ]
+  },
+  {
+    "name": "palace_king_boundary",
+    "fen": "9/5k3/9/9/9/9/9/9/9/3K5 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "d1c1",
+      "d1c2"
+    ],
+    "mustContain": [
+      "d1e2"
+    ]
+  },
+  {
+    "name": "palace_guard_boundary",
+    "fen": "9/3k5/9/9/9/9/9/9/4K4/3A5 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "mustNotContain": [
+      "d1c1",
+      "d1c2"
+    ],
+    "mustContain": [
+      "d1d2"
+    ]
+  },
+  {
+    "name": "bikjang_offered_not_check",
+    "fen": "9/4k4/9/9/9/9/9/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "expectedBikjang": true,
+    "mustContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "bikjang_declined",
+    "fen": "9/4k4/9/9/9/9/9/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "moves": [
+      "e2d2"
+    ],
+    "expectedBikjang": false
+  },
+  {
+    "name": "bikjang_accepted_material",
+    "fen": "9/4k4/9/9/9/9/9/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "win",
+    "expectedReason": "bikjang",
+    "minimumLegalMoves": 0,
+    "moves": [
+      "e2e2"
+    ],
+    "expectedBikjang": true,
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "bikjang_accepted_traditional_draw",
+    "fen": "9/4k4/9/9/9/9/9/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "draw",
+    "expectedReason": "bikjang",
+    "minimumLegalMoves": 0,
+    "moves": [
+      "e2e2"
+    ],
+    "variant": "janggitraditional",
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "bikjang_check_pass_exception",
+    "fen": "9/4k4/9/9/9/9/9/9/r3K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "expectedBikjang": true,
+    "mustContain": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "bikjang_check_acceptance_not_mate",
+    "fen": "9/4k4/9/9/9/9/9/9/r3K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "win",
+    "expectedReason": "bikjang",
+    "minimumLegalMoves": 0,
+    "moves": [
+      "e2e2"
+    ],
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "one_pass_ongoing",
+    "fen": "rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "moves": [
+      "e2e2"
+    ]
+  },
+  {
+    "name": "double_pass_material",
+    "fen": "rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "loss",
+    "expectedReason": "double_pass",
+    "minimumLegalMoves": 0,
+    "moves": [
+      "e2e2",
+      "e9e9"
+    ],
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "double_pass_traditional_draw",
+    "fen": "rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "draw",
+    "expectedReason": "double_pass",
+    "minimumLegalMoves": 0,
+    "moves": [
+      "e2e2",
+      "e9e9"
+    ],
+    "variant": "janggitraditional",
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "one_repetition_ongoing",
+    "fen": "rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "moves": [
+      "b1c3",
+      "b10c8",
+      "c3b1",
+      "c8b10"
+    ]
+  },
+  {
+    "name": "threefold_material",
+    "fen": "rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "loss",
+    "expectedReason": "repetition",
+    "minimumLegalMoves": 0,
+    "moves": [
+      "b1c3",
+      "b10c8",
+      "c3b1",
+      "c8b10",
+      "b1c3",
+      "b10c8",
+      "c3b1",
+      "c8b10"
+    ],
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "threefold_traditional_draw",
+    "fen": "rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "draw",
+    "expectedReason": "repetition",
+    "minimumLegalMoves": 0,
+    "moves": [
+      "b1c3",
+      "b10c8",
+      "c3b1",
+      "c8b10",
+      "b1c3",
+      "b10c8",
+      "c3b1",
+      "c8b10"
+    ],
+    "variant": "janggitraditional",
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "perpetual_check_penalty",
+    "fen": "9/3k5/9/9/9/9/9/9/r3K4/9 w - - 0 1",
+    "expectedCheck": true,
+    "expectedResult": "win",
+    "expectedReason": "perpetual_check",
+    "minimumLegalMoves": 0,
+    "moves": [
+      "e2e3",
+      "a2a3",
+      "e3e2",
+      "a3a2",
+      "e2e3",
+      "a2a3",
+      "e3e2",
+      "a3a2"
+    ],
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "move_limit_material",
+    "fen": "rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 100 51",
+    "expectedCheck": false,
+    "expectedResult": "loss",
+    "expectedReason": "move_limit",
+    "minimumLegalMoves": 0,
+    "exactLegalMoves": 0
+  },
+  {
+    "name": "capture_then_pass_mate_score_is_rule_win",
+    "fen": "9/3k5/9/p8/9/9/R8/9/4K4/9 w - - 0 1",
+    "expectedCheck": false,
+    "expectedResult": "ongoing",
+    "expectedReason": "none",
+    "minimumLegalMoves": 1,
+    "moves": [
+      "a4a7",
+      "d9d9"
+    ],
+    "searchMate": true
+  }
+]

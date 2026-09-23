@@ -2620,7 +2620,9 @@ bool Position::see_ge(Move m, Value threshold) const {
 /// Position::is_optional_game_end() tests whether the position may end the game by
 /// 50-move rule, by repetition, or a variant rule that allows a player to claim a game result.
 
-bool Position::is_optional_game_end(Value& result, int ply, int countStarted) const {
+bool Position::is_optional_game_end(Value& result, int ply, int countStarted, const char** reason) const {
+
+  if (reason) *reason = "variant";
 
   // n-move rule
   if (n_move_rule() && st->rule50 > (2 * n_move_rule() - 1) && (!checkers() || MoveList<LEGAL>(*this).size()))
@@ -2642,6 +2644,7 @@ bool Position::is_optional_game_end(Value& result, int ply, int countStarted) co
       }
       if (st->rule50 - offset > (2 * n_move_rule() - 1))
       {
+          if (reason) *reason = "move_limit";
           result = var->materialCounting ? convert_mate_value(material_counting_result(), ply) : VALUE_DRAW;
           return true;
       }
@@ -2686,6 +2689,7 @@ bool Position::is_optional_game_end(Value& result, int ply, int countStarted) co
                       if (!stp->previous->previous->capturedPiece && from_sq(stp->move) == to_sq(stp->previous->previous->move))
                       {
                           result = VALUE_MATE;
+                          if (reason) *reason = "move_repetition";
                           return true;
                       }
                       else
@@ -2709,6 +2713,8 @@ bool Position::is_optional_game_end(Value& result, int ply, int countStarted) co
                                               : var->nFoldValue, ply);
                   if (result == VALUE_DRAW && var->materialCounting)
                       result = convert_mate_value(material_counting_result(), ply);
+                  if (reason) *reason = (perpetualThem || perpetualUs) ? "perpetual_check"
+                                      : (chaseThem || chaseUs) ? "perpetual_chase" : "repetition";
                   return true;
               }
 
@@ -2758,7 +2764,9 @@ bool Position::is_optional_game_end(Value& result, int ply, int countStarted) co
 /// immediately by a variant rule, i.e., there are no more legal moves.
 /// It does not detect stalemates.
 
-bool Position::is_immediate_game_end(Value& result, int ply) const {
+bool Position::is_immediate_game_end(Value& result, int ply, const char** reason) const {
+
+  if (reason) *reason = "variant";
 
   // Extinction
   // Extinction does not apply for pseudo-royal pieces, because they can not be captured
@@ -2942,6 +2950,9 @@ bool Position::is_immediate_game_end(Value& result, int ply) const {
   if (   (st->pliesFromNull > 0 && ((st->bikjang && st->previous->bikjang) || ((st->pass && st->previous->pass)&&!var->wallOrMove)))
       || (var->adjudicateFullBoard && !(~pieces() & board_bb())))
   {
+      if (reason) *reason = st->pliesFromNull > 0 && st->bikjang && st->previous->bikjang ? "bikjang"
+                          : st->pliesFromNull > 0 && st->pass && st->previous->pass && !var->wallOrMove ? "double_pass"
+                          : "board_full";
       result = var->materialCounting ? convert_mate_value(material_counting_result(), ply) : VALUE_DRAW;
       return true;
   }

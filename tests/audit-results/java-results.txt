@@ -1,0 +1,1 @@
+PASS: state/result/reason parsing, mate score separation, empty/missing/contradictory frames, terminal input guard, NNUE rejection isolation, 20 alternating plies, MultiPV stop, resynchronization, pre-cancelled search.

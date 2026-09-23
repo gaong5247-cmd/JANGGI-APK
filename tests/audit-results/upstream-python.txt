@@ -1,0 +1,62 @@
+test_captures_to_hand (__main__.TestPyffish.test_captures_to_hand) ... ok
+test_castling (__main__.TestPyffish.test_castling) ... ok
+test_game_result (__main__.TestPyffish.test_game_result) ... ok
+test_get_fen (__main__.TestPyffish.test_get_fen) ... ok
+test_get_fog_fen (__main__.TestPyffish.test_get_fog_fen) ... ok
+test_get_san (__main__.TestPyffish.test_get_san) ... ok
+test_get_san_moves (__main__.TestPyffish.test_get_san_moves) ... ok
+test_gives_check (__main__.TestPyffish.test_gives_check) ... ok
+test_has_insufficient_material (__main__.TestPyffish.test_has_insufficient_material) ... ok
+test_info (__main__.TestPyffish.test_info) ... ok
+test_is_capture (__main__.TestPyffish.test_is_capture) ... ok
+test_is_immediate_game_end (__main__.TestPyffish.test_is_immediate_game_end) ... ok
+test_is_optional_game_end (__main__.TestPyffish.test_is_optional_game_end) ... ok
+test_legal_moves (__main__.TestPyffish.test_legal_moves) ... ok
+test_piece_to_partner (__main__.TestPyffish.test_piece_to_partner) ... ok
+test_set_option (__main__.TestPyffish.test_set_option) ... ok
+test_start_fen (__main__.TestPyffish.test_start_fen) ... ok
+test_two_boards (__main__.TestPyffish.test_two_boards) ... ok
+test_typing_metadata (__main__.TestPyffish.test_typing_metadata) ... ok
+test_validate_fen (__main__.TestPyffish.test_validate_fen) ... Invalid check count '0'. Expects 3 characters. Actual: 1 character(s).
+Invalid move counter: 'a'.
+Invalid half move counter: 'b'.
+Invalid en-passant square '-6'. Expects 1st character to be a letter.
+Invalid en-passant square '.6'. Expects 1st character to be a letter.
+Invalid en-passant square 'd-'. Expects 2nd character to be a digit.
+Invalid en-passant square ''. Expects 2 characters. Actual: 0 character(s).
+Invalid castling specification: '1'.
+Invalid side to move specification: 'g'.
+Invalid piece character: 'H'.
+curRankWidth != nbFiles: 7 != 8
+curRankWidth != nbFiles: 9 != 8
+Invalid number of ranks. Expected: 8 Actual: 7
+No castling rook for flag k
+No castling rook for flag q
+The WHITE king must be on rank 0 if castling is enabled for WHITE.
+The WHITE king must be on rank 0 if castling is enabled for WHITE.
+The BLACK king must be on rank 7 if castling is enabled for BLACK.
+The WHITE king must be on rank 0 if castling is enabled for WHITE.
+Invalid check count '3+a'. Expects 3rd character to be a digit.
+Invalid check count '1'. Expects 4 characters. Actual: 1 character(s).
+Invalid check count '0'. Expects 3 characters. Actual: 1 character(s).
+Invalid check count '+a+2'. Expects 2nd character to be a digit up to 3.
+Invalid check count '0'. Expects 3 characters. Actual: 1 character(s).
+Invalid check count '+1+4'. Expects 4th character to be a digit up to 3.
+Invalid number of white kings. Expected: 0. Given: 1
+Invalid number of black kings. Expected: 1. Given: 0
+Invalid number of white kings. Expected: 1. Given: 0
+The WHITE king must be on rank 1 if castling is enabled for WHITE.
+No gating piece for flag g
+No gating piece for flag f
+ok
+test_validate_fen_promoted_pieces (__main__.TestPyffish.test_validate_fen_promoted_pieces) ... Invalid promoted piece: '+' followed by 'K'. This piece cannot be promoted in variant.
+Invalid promoted piece: '+' followed by 'K'. This piece cannot be promoted in variant.
+Invalid piece character: '+'.
+ok
+test_variants_loaded (__main__.TestPyffish.test_variants_loaded) ... ok
+test_version (__main__.TestPyffish.test_version) ... ok
+
+----------------------------------------------------------------------
+Ran 23 tests in 0.991s
+
+OK

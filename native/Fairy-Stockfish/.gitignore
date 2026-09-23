@@ -1,6 +1,7 @@
 # Ignore binaries in src/ that have no extension
 /src/*
 !/src/*.*
+!/src/Makefile
 !/src/*/
 
 # Files from build

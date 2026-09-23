@@ -320,10 +320,11 @@ public:
   bool is_chess960() const;
   Thread* this_thread() const;
   bool is_immediate_game_end() const;
-  bool is_immediate_game_end(Value& result, int ply = 0) const;
+  bool is_immediate_game_end(Value& result, int ply = 0, const char** reason = nullptr) const;
   bool is_optional_game_end() const;
-  bool is_optional_game_end(Value& result, int ply = 0, int countStarted = 0) const;
-  bool is_game_end(Value& result, int ply = 0) const;
+  bool is_optional_game_end(Value& result, int ply = 0, int countStarted = 0, const char** reason = nullptr) const;
+  // Optional reason is authoritative only when the method returns true.
+  bool is_game_end(Value& result, int ply = 0, const char** reason = nullptr) const;
   Value material_counting_result() const;
   bool is_draw(int ply) const;
   bool has_game_cycle(int ply) const;
@@ -1154,8 +1155,8 @@ inline bool Position::is_draw(int ply) const {
   return is_optional_game_end(result, ply);
 }
 
-inline bool Position::is_game_end(Value& result, int ply) const {
-  return is_immediate_game_end(result, ply) || is_optional_game_end(result, ply);
+inline bool Position::is_game_end(Value& result, int ply, const char** reason) const {
+  return is_immediate_game_end(result, ply, reason) || is_optional_game_end(result, ply, 0, reason);
 }
 
 inline Color Position::side_to_move() const {

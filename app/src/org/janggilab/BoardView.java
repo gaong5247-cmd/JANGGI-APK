@@ -10,6 +10,7 @@ import java.util.*;
 
 final class BoardView extends View {
     interface Tap { void square(String square); }
+    interface Drag { void move(String from,String to); }
     final Paint p=new Paint(3);
     final char[][] pieces=new char[10][9];
     final Set<String> targets=new HashSet<>();
@@ -17,6 +18,8 @@ final class BoardView extends View {
     boolean flipped;
     float cell, ox, oy;
     Tap tap;
+    Drag drag;
+    String downSquare="";
     BoardView(Context c) { super(c); setContentDescription("장기판. 기물을 선택하고 표시된 합법수 위치를 누르세요."); setLayerType(View.LAYER_TYPE_SOFTWARE,null); }
     void fen(String fen) {
         for(char[] row:pieces) Arrays.fill(row,' ');
@@ -28,6 +31,29 @@ final class BoardView extends View {
             }
         }
         invalidate();
+    }
+    void setPiece(String square,char piece) {
+        int[] a=parse(square);
+        if(a[0]>=0&&a[0]<9&&a[1]>=0&&a[1]<10) { pieces[a[1]][a[0]]=piece; invalidate(); }
+    }
+    char piece(String square) {
+        int[] a=parse(square);
+        return a[0]>=0&&a[0]<9&&a[1]>=0&&a[1]<10?pieces[a[1]][a[0]]:' ';
+    }
+    String toFen(boolean white) {
+        StringBuilder out=new StringBuilder();
+        for(int rank=9;rank>=0;rank--) {
+            int empty=0;
+            for(int file=0;file<9;file++) {
+                char ch=pieces[rank][file];
+                if(ch==' ') { empty++; continue; }
+                if(empty>0) { out.append(empty); empty=0; }
+                out.append(ch);
+            }
+            if(empty>0)out.append(empty);
+            if(rank>0)out.append('/');
+        }
+        return out.append(white?" w - - 0 1":" b - - 0 1").toString();
     }
     static int[] parse(String s) {
         try { return new int[]{s.charAt(0)-'a',Integer.parseInt(s.substring(1))-1}; }
@@ -78,11 +104,16 @@ final class BoardView extends View {
         }
     }
     @Override public boolean onTouchEvent(android.view.MotionEvent e) {
-        if(e.getAction()==MotionEvent.ACTION_UP && cell>0) {
-            int f=Math.round((e.getX()-ox)/cell),r=Math.round((e.getY()-oy)/cell);
-            if(f>=0&&f<9&&r>=0&&r<10&&tap!=null)tap.square(""+(char)('a'+(flipped?8-f:f))+(flipped?r+1:10-r));
-            performClick();return true;
-        } return true;
+        if(cell<=0)return true;
+        int f=Math.round((e.getX()-ox)/cell),r=Math.round((e.getY()-oy)/cell);
+        String square=(f>=0&&f<9&&r>=0&&r<10)?""+(char)('a'+(flipped?8-f:f))+(flipped?r+1:10-r):"";
+        if(e.getAction()==MotionEvent.ACTION_DOWN){downSquare=square;return true;}
+        if(e.getAction()==MotionEvent.ACTION_UP){
+            if(!downSquare.isEmpty()&&!square.isEmpty()&&!downSquare.equals(square)&&drag!=null)drag.move(downSquare,square);
+            else if(!square.isEmpty()&&tap!=null)tap.square(square);
+            downSquare="";performClick();return true;
+        }
+        return true;
     }
     @Override public boolean performClick(){super.performClick();return true;}
 }

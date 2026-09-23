@@ -389,18 +389,27 @@ void UCI::loop(int argc, char* argv[]) {
       else if (token == "appstate")
       {
           Value result = VALUE_ZERO;
-          bool ended = pos.is_game_end(result);
+          const char* reason = "none";
+          bool ended = pos.is_game_end(result, 0, &reason);
           MoveList<LEGAL> legal(pos);
+          // LEGAL includes a legal pass and is empty after immediate variant
+          // endings. Preserve those endings before considering checkmate.
           if (!ended && legal.size() == 0) {
               ended = true;
-              result = pos.checkers() ? -VALUE_MATE : pos.stalemate_value();
+              result = pos.checkers() ? pos.checkmate_value() : pos.stalemate_value();
+              reason = pos.checkers() ? "checkmate" : "stalemate";
           }
           sync_cout << "appfen " << pos.fen() << sync_endl;
           sync_cout << "applegal";
-          for (const auto& m : legal) std::cout << " " << UCI::move(pos, m);
+          // Optional endings (repetition, move limit) may still have geometric
+          // legal moves. The app adjudicates them, so expose no playable moves.
+          if (!ended)
+              for (const auto& m : legal) std::cout << " " << UCI::move(pos, m);
           std::cout << sync_endl;
           sync_cout << "appresult " << (ended ? (result > 0 ? "win" : result < 0 ? "loss" : "draw") : "ongoing") << sync_endl;
+          sync_cout << "appreason " << (ended ? reason : "none") << sync_endl;
           sync_cout << "appcheck " << (pos.checkers() ? 1 : 0) << sync_endl;
+          sync_cout << "appbikjang " << (pos.bikjang() ? 1 : 0) << sync_endl;
           sync_cout << "appdone" << sync_endl;
       }
       else if (token == "flip")     pos.flip();

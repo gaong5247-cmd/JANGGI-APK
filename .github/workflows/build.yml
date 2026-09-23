@@ -1,0 +1,94 @@
+name: Verify and build Janggi Lab
+on:
+  push:
+    branches: [main, 'codex/janggi-state-nnue']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: sudo apt-get update && sudo apt-get install -y expect
+      - name: Build host engine
+        run: make -C native/Fairy-Stockfish/src -j4 build ARCH=x86-64 largeboards=yes nnue=no
+      - name: App regression suites
+        run: |
+          mkdir -p build
+          python3 tests/engine_smoke.py native/Fairy-Stockfish/src/stockfish | tee build/smoke.json
+          python3 tests/janggi_regression.py native/Fairy-Stockfish/src/stockfish | tee build/regression.json
+          javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/AnalysisScore.java tests/EngineIntegration.java
+          java -cp build/classes org.janggilab.EngineIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" | tee build/java-results.txt
+      - name: Upstream engine checks
+        working-directory: native/Fairy-Stockfish/src
+        run: |
+          ./stockfish bench > ../../../build/bench.txt 2>&1
+          ./stockfish check variants.ini > ../../../build/variants.txt 2>&1
+          bash ../tests/perft.sh largeboard > ../../../build/upstream-perft.txt 2>&1
+          bash ../tests/protocol.sh > ../../../build/upstream-protocol.txt 2>&1
+      - name: Upstream Python tests
+        working-directory: native/Fairy-Stockfish
+        run: |
+          python3 -m pip install setuptools
+          CC=gcc CXX=g++ python3 setup.py build_ext --inplace -j4 > ../../build/pyffish-build.txt 2>&1
+          python3 test.py > ../../build/upstream-python.txt 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-logs
+          path: |
+            build/*.json
+            build/*.txt
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+      - name: Build armv7, armv8, x86_64 and Universal APKs
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
+          python3 scripts/build.py
+      - name: Verify ABI and ELF page alignment
+        run: python3 tests/verify_apks.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JanggiLab-Android
+          path: dist/*
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: make mingw-w64-x86_64-gcc mingw-w64-x86_64-python
+      - name: Build standalone x86_64 EXE
+        run: |
+          make -C native/Fairy-Stockfish/src -j4 build ARCH=x86-64 COMP=mingw largeboards=yes nnue=no EXTRALDFLAGS=-static
+          mkdir -p dist
+          cp native/Fairy-Stockfish/src/stockfish.exe dist/janggilab-engine-x86_64.exe
+      - name: Test Windows executable
+        run: |
+          python tests/engine_smoke.py dist/janggilab-engine-x86_64.exe > dist/windows-smoke.json
+          python tests/janggi_regression.py dist/janggilab-engine-x86_64.exe > dist/windows-regression.json
+          cd dist
+          sha256sum janggilab-engine-x86_64.exe > EXE-SHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JanggiLab-Windows-x86_64
+          path: dist/*
