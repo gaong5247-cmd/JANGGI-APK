@@ -5,6 +5,8 @@ on:
       - main
       - 'fix/**'
       - 'codex/**'
+    tags:
+      - 'v*'
   pull_request:
   workflow_dispatch:
 permissions:
@@ -104,3 +106,29 @@ jobs:
         with:
           name: JanggiLab-Windows-x86_64
           path: dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: JanggiLab-Android
+          path: release-assets/android
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: JanggiLab-Windows-x86_64
+          path: release-assets/windows
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release-assets/android/*.apk
+            release-assets/windows/*.exe
+            release-assets/windows/EXE-SHA256.txt
