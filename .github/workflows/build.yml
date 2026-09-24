@@ -1,7 +1,10 @@
 name: Verify and build Janggi Lab
 on:
   push:
-    branches: [main, 'codex/janggi-state-nnue']
+    branches:
+      - main
+      - 'fix/**'
+      - 'codex/**'
   pull_request:
   workflow_dispatch:
 permissions:
