@@ -6,7 +6,7 @@ on:
       - 'fix/**'
       - 'codex/**'
     tags:
-      - 'v*'
+      - 'janggi_v*'
   pull_request:
   workflow_dispatch:
 permissions:
@@ -108,7 +108,7 @@ jobs:
           path: dist/*
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/janggi_v')
     needs: [android, windows]
     runs-on: ubuntu-latest
     permissions:
