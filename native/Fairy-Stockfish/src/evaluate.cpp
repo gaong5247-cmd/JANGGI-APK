@@ -90,8 +90,12 @@ namespace Eval {
     while (getline(ss, eval_file, UCI::SepChar))
     {
         string basename = eval_file.substr(eval_file.find_last_of("\\/") + 1);
-        string nnueAlias = variants.find(variant)->second->nnueAlias;
-        if (basename.rfind(variant, 0) != string::npos || (!nnueAlias.empty() && basename.rfind(nnueAlias, 0) != string::npos))
+        const Variant* activeVariant = variants.find(variant)->second;
+        string nnueAlias = activeVariant->nnueAlias;
+        string nnueTemplate = activeVariant->variantTemplate;
+        if (basename.rfind(variant, 0) != string::npos
+            || (!nnueAlias.empty() && basename.rfind(nnueAlias, 0) != string::npos)
+            || (!nnueTemplate.empty() && basename.rfind(nnueTemplate, 0) != string::npos))
         {
             useNNUE = true;
             break;
