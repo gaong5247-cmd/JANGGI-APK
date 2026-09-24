@@ -1,0 +1,170 @@
+{
+  "passed": 33,
+  "cases": [
+    {
+      "variant": "shogi",
+      "depth": 4,
+      "nodes": 719731
+    },
+    {
+      "variant": "shoshogi",
+      "depth": 4,
+      "nodes": 445372
+    },
+    {
+      "variant": "yarishogi",
+      "depth": 4,
+      "nodes": 158404
+    },
+    {
+      "variant": "capablanca",
+      "depth": 4,
+      "nodes": 805128
+    },
+    {
+      "variant": "embassy",
+      "depth": 4,
+      "nodes": 809539
+    },
+    {
+      "variant": "janus",
+      "depth": 4,
+      "nodes": 772074
+    },
+    {
+      "variant": "modern",
+      "depth": 4,
+      "nodes": 433729
+    },
+    {
+      "variant": "chancellor",
+      "depth": 4,
+      "nodes": 436656
+    },
+    {
+      "variant": "courier",
+      "depth": 4,
+      "nodes": 500337
+    },
+    {
+      "variant": "grand",
+      "depth": 3,
+      "nodes": 259514
+    },
+    {
+      "variant": "grand",
+      "depth": 2,
+      "nodes": 5768
+    },
+    {
+      "variant": "opulent",
+      "depth": 3,
+      "nodes": 133829
+    },
+    {
+      "variant": "tencubed",
+      "depth": 3,
+      "nodes": 68230
+    },
+    {
+      "variant": "centaur",
+      "depth": 3,
+      "nodes": 24490
+    },
+    {
+      "variant": "gustav3",
+      "depth": 4,
+      "nodes": 331659
+    },
+    {
+      "variant": "omicron",
+      "depth": 4,
+      "nodes": 967381
+    },
+    {
+      "variant": "troitzky",
+      "depth": 3,
+      "nodes": 8766
+    },
+    {
+      "variant": "wolf",
+      "depth": 3,
+      "nodes": 13722
+    },
+    {
+      "variant": "wolf",
+      "depth": 4,
+      "nodes": 10587
+    },
+    {
+      "variant": "shako",
+      "depth": 3,
+      "nodes": 26325
+    },
+    {
+      "variant": "shako",
+      "depth": 3,
+      "nodes": 180467
+    },
+    {
+      "variant": "shako",
+      "depth": 2,
+      "nodes": 4940
+    },
+    {
+      "variant": "shako",
+      "depth": 2,
+      "nodes": 460
+    },
+    {
+      "variant": "xiangqi",
+      "depth": 4,
+      "nodes": 3290240
+    },
+    {
+      "variant": "xiangqi",
+      "depth": 4,
+      "nodes": 4485547
+    },
+    {
+      "variant": "xiangqi",
+      "depth": 4,
+      "nodes": 92741
+    },
+    {
+      "variant": "manchu",
+      "depth": 4,
+      "nodes": 798554
+    },
+    {
+      "variant": "janggi",
+      "depth": 4,
+      "nodes": 1065277
+    },
+    {
+      "variant": "janggi",
+      "depth": 4,
+      "nodes": 76763
+    },
+    {
+      "variant": "janggi",
+      "depth": 4,
+      "nodes": 151202
+    },
+    {
+      "variant": "jesonmor",
+      "depth": 3,
+      "nodes": 27960
+    },
+    {
+      "variant": "jesonmor",
+      "depth": 3,
+      "nodes": 37564
+    },
+    {
+      "variant": "flipello10",
+      "depth": 7,
+      "nodes": 55180
+    }
+  ]
+}

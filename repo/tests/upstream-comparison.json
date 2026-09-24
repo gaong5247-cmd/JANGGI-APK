@@ -1,0 +1,44 @@
+{
+  "repository": "gaong5247-cmd/JANGGI-APK",
+  "commit": "5d94bc2d98d7d1a1fe819d0e88c8fdab045ddf4c",
+  "upstream": "fairy-stockfish/Fairy-Stockfish",
+  "upstreamCommit": "226c7f18c854372d5612be2a7d7f14449ae5a239",
+  "files": [
+    {
+      "path": "src/uci.cpp",
+      "repositoryBlob": "2f44993ca8b1dcf851d878a4011de55f13badcd9",
+      "upstreamBlob": "584977aadeb467e9f47d0d1d27f8ac1b296dfa28",
+      "identical": false
+    },
+    {
+      "path": "src/position.cpp",
+      "repositoryBlob": "6d59ef648c459b60dc2c503fb2355a9b117ca663",
+      "upstreamBlob": "6d59ef648c459b60dc2c503fb2355a9b117ca663",
+      "identical": true
+    },
+    {
+      "path": "src/position.h",
+      "repositoryBlob": "685c07992a0e8f6f1538d03fb72423812c4fdfff",
+      "upstreamBlob": "685c07992a0e8f6f1538d03fb72423812c4fdfff",
+      "identical": true
+    },
+    {
+      "path": "src/movegen.cpp",
+      "repositoryBlob": "a7b6a9f9f4fda8ab27edb9170538a4bef8844cf2",
+      "upstreamBlob": "a7b6a9f9f4fda8ab27edb9170538a4bef8844cf2",
+      "identical": true
+    },
+    {
+      "path": "src/variant.cpp",
+      "repositoryBlob": "e722d2593893ea174e6e7dfed0fcd74c65b8ae80",
+      "upstreamBlob": "e722d2593893ea174e6e7dfed0fcd74c65b8ae80",
+      "identical": true
+    },
+    {
+      "path": "src/variants.ini",
+      "repositoryBlob": "5b63bf0e093d204931f0bc8be9a7d5757bb904d5",
+      "upstreamBlob": "5b63bf0e093d204931f0bc8be9a7d5757bb904d5",
+      "identical": true
+    }
+  ]
+}
