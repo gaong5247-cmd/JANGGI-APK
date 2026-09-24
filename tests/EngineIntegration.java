@@ -35,11 +35,35 @@ public final class EngineIntegration {
   ArrayList<String> malformed=new ArrayList<>(frame);malformed.set(3,"appresult ongoing");
   try{Engine.State.parse(malformed);throw new AssertionError("accepted contradictory state");}catch(java.io.IOException expected){}
  }
+ static void variantChecks(Engine a,Engine b,String fen)throws Exception {
+  for(String variant:VariantConfig.IDS){
+   a.setVariant(variant);b.setVariant(variant);
+   Engine.State sa=a.state(),sb=b.state();
+   check(variant.equals(sa.variant)&&variant.equals(sb.variant),"A/B variant mismatch");
+   check(sa.fen.equals(sb.fen)&&sa.fen.equals(sa.startFen)&&sa.startFen.equals(fen),"engine start FEN");
+   check(sa.legal.contains("e2e2")==VariantConfig.allowsPass(variant),"pass policy");
+   a.position(fen,Arrays.asList("b1c3","b10c8"));
+   ExecutorService executor=Executors.newSingleThreadExecutor();
+   CountDownLatch started=new CountDownLatch(1);
+   Future<String> search=executor.submit(()->a.search(600000,()->true,line->{if(line.startsWith("info depth"))started.countDown();}));
+   try {
+    check(started.await(10,TimeUnit.SECONDS),"search failed to start");
+    Engine.State reset=a.setVariant(variant);
+    check(search.get(5,TimeUnit.SECONDS)!=null,"missing stopped bestmove");
+    check(reset.fen.equals(fen)&&reset.ongoing(),"variant change retained old history");
+    a.ready();check(a.state().fen.equals(fen),"stale response after variant switch");
+   }finally{a.stop();executor.shutdownNow();}
+   try{a.setVariant("janggi\nquit");throw new AssertionError("variant injection accepted");}catch(IllegalArgumentException expected){}
+   check(a.variant().equals(variant),"invalid variant changed engine");
+  }
+  a.setVariant("janggi");b.setVariant("janggi");
+ }
  public static void main(String[] args)throws Exception {
   Engine a=new Engine(args[0]), b=new Engine(args[0]);
   String fen="rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1";
   ArrayList<String> moves=new ArrayList<>();
   try{
+   variantChecks(a,b,fen);
    stateChecks(a,fen);
    for(int i=0;i<20;i++){
     Engine e=i%2==0?a:b;e.position(fen,moves);Engine.State st=e.state();
@@ -62,7 +86,7 @@ public final class EngineIntegration {
    finally{probe.close();Files.delete(bad);}
    a.position(fen,Collections.emptyList());check(a.state().ongoing(),"failed probe damaged live engine");
    if(args.length>1){Engine net=new Engine(args[0]);try{net.useNetwork(args[1]);stateChecks(net,fen);}finally{net.close();}}
-   System.out.println("PASS: state/result/reason parsing, mate score separation, empty/missing/contradictory frames, terminal input guard, NNUE rejection isolation, 20 alternating plies, MultiPV stop, resynchronization, pre-cancelled search.");
+   System.out.println("PASS: four variants, A/B agreement, engine start FEN, active-search rule switching, history reset, variant injection rejection, state/result/reason parsing, mate score separation, empty/missing/contradictory frames, terminal input guard, NNUE rejection isolation, 20 alternating plies, MultiPV stop, resynchronization, pre-cancelled search.");
   }finally{a.close();b.close();}
  }
 }

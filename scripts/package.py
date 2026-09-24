@@ -19,7 +19,13 @@ jar = sdk / 'platforms' / 'android-35' / 'android.jar'
 abis = sys.argv[1:] or ['arm64-v8a', 'armeabi-v7a', 'x86_64']
 
 def run(args):
-    subprocess.run([str(x) for x in args], check=True)
+    args=[str(x) for x in args]
+    if os.name == 'nt':
+        command=pathlib.Path(args[0])
+        for suffix in ('.exe','.bat'):
+            if command.with_suffix(suffix).is_file():
+                args[0]=str(command.with_suffix(suffix));break
+    subprocess.run(args, check=True)
 
 for d in ['classes', 'dex']:
     shutil.rmtree(B / d, ignore_errors=True)

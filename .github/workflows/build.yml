@@ -21,9 +21,11 @@ jobs:
       - name: App regression suites
         run: |
           mkdir -p build
+          python3 scripts/embed_variants.py --check
+          python3 tests/variant_regression.py native/Fairy-Stockfish/src/stockfish | tee build/variants.json
           python3 tests/engine_smoke.py native/Fairy-Stockfish/src/stockfish | tee build/smoke.json
           python3 tests/janggi_regression.py native/Fairy-Stockfish/src/stockfish | tee build/regression.json
-          javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/AnalysisScore.java tests/EngineIntegration.java
+          javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java tests/EngineIntegration.java
           java -cp build/classes org.janggilab.EngineIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" | tee build/java-results.txt
       - name: Upstream engine checks
         working-directory: native/Fairy-Stockfish/src
@@ -84,6 +86,8 @@ jobs:
           cp native/Fairy-Stockfish/src/stockfish.exe dist/janggilab-engine-x86_64.exe
       - name: Test Windows executable
         run: |
+          python scripts/embed_variants.py --check
+          python tests/variant_regression.py dist/janggilab-engine-x86_64.exe > dist/windows-variants.json
           python tests/engine_smoke.py dist/janggilab-engine-x86_64.exe > dist/windows-smoke.json
           python tests/janggi_regression.py dist/janggilab-engine-x86_64.exe > dist/windows-regression.json
           cd dist

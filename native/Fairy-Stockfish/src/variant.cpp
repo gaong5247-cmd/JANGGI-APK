@@ -1787,6 +1787,8 @@ namespace {
     Variant* janggi_variant() {
         Variant* v = xiangqi_variant_base()->init();
         v->variantTemplate = "janggi";
+        // Internal field (not an INI option); inherited by all four app rules.
+        v->nnueAlias = "janggi";
         v->pieceToCharTable = ".N.R.AB.P..C.........K.n.r.ab.p..c.........k";
         v->remove_piece(FERS);
         v->remove_piece(CANNON);
@@ -1807,26 +1809,6 @@ namespace {
         v->pass[BLACK] = true;
         v->nFoldValue = VALUE_DRAW;
         v->perpetualCheckIllegal = true;
-        return v;
-    }
-    // Traditional rules of Janggi, where bikjang is a draw
-    Variant* janggi_traditional_variant() {
-        Variant* v = janggi_variant()->init();
-        v->bikjangRule = true;
-        v->materialCounting = NO_MATERIAL_COUNTING;
-        v->nnueAlias = "janggi";
-        return v;
-    }
-    // Modern rules of Janggi, where bikjang is not considered, but material counting is.
-    // The repetition rules are also adjusted for better compatibility with Kakao Janggi.
-    Variant* janggi_modern_variant() {
-        Variant* v = janggi_variant()->init();
-        v->bikjangRule = false;
-        v->materialCounting = JANGGI_MATERIAL;
-        v->moveRepetitionIllegal = true;
-        v->nFoldRule = 4; // avoid nFold being triggered before move repetition
-        v->nMoveRule = 100; // avoid adjudication before reaching 200 half-moves
-        v->nnueAlias = "janggi";
         return v;
     }
     // Casual rules of Janggi, where bikjang and material counting are not considered
@@ -1969,8 +1951,11 @@ void VariantMap::init() {
     add("manchu", manchu_variant());
     add("supply", supply_variant());
     add("janggi", janggi_variant());
-    add("janggitraditional", janggi_traditional_variant());
-    add("janggimodern", janggi_modern_variant());
+    // Same INI parser and inherited rules on Android and standalone Windows.
+    std::istringstream appVariants(
+#include "janggi_variants.inc"
+    );
+    parse_istream<false>(appVariants);
     add("janggicasual", janggi_casual_variant());
 #endif
 }
@@ -2175,7 +2160,14 @@ void VariantMap::parse_istream(std::istream& file) {
         }
 
         // Create variant
-        if (variants.find(variant) != variants.end())
+        if (DoCheck && variants.find(variant) != variants.end() && !variant_template.empty()
+            && variants.find(variant_template) != variants.end())
+        {
+            // Validate INI definitions of embedded variants without replacing them.
+            delete VariantParser<DoCheck>(attribs).parse(
+                (new Variant(*variants.find(variant_template)->second))->init());
+        }
+        else if (variants.find(variant) != variants.end())
             std::cerr << "Variant '" << variant << "' already exists." << std::endl;
         else if (!variant_template.empty() && variants.find(variant_template) == variants.end())
             std::cerr << "Variant template '" << variant_template << "' does not exist." << std::endl;

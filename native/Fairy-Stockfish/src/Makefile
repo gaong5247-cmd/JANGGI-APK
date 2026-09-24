@@ -938,6 +938,9 @@ config-sanity: $(load_net)
 	@test "$(comp)" = "gcc" || test "$(comp)" = "icc" || test "$(comp)" = "mingw" || test "$(comp)" = "clang" \
 	|| test "$(comp)" = "armv7a-linux-androideabi16-clang"  || test "$(comp)" = "aarch64-linux-android21-clang"
 
+# The generic dependency scan does not define LARGEBOARDS, so it misses this include.
+variant.o: janggi_variants.inc
+
 $(EXE): $(OBJS)
 	+$(CXX) -o $@ $(OBJS) $(LDFLAGS)
 

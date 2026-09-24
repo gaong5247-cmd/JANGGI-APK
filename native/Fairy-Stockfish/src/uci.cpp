@@ -399,6 +399,8 @@ void UCI::loop(int argc, char* argv[]) {
               result = pos.checkers() ? pos.checkmate_value() : pos.stalemate_value();
               reason = pos.checkers() ? "checkmate" : "stalemate";
           }
+          sync_cout << "appvariant " << std::string(Options["UCI_Variant"]) << sync_endl;
+          sync_cout << "appstartfen " << pos.variant()->startFen << sync_endl;
           sync_cout << "appfen " << pos.fen() << sync_endl;
           sync_cout << "applegal";
           // Optional endings (repetition, move limit) may still have geometric

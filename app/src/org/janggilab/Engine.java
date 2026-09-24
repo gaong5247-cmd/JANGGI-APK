@@ -16,16 +16,25 @@ final class Engine {
     private volatile boolean closed;
     private volatile String lastLine = "";
     private int lastSkill=-1, lastThreads=-1, lastHash=-1, lastPv=-1;
+    private final Object responseLock = new Object();
+    private final Set<String> supportedVariants = new HashSet<>();
+    private String variant;
     interface Info { void line(String line); }
-    Engine(String path) throws Exception {
+    Engine(String path) throws Exception { this(path, "janggi"); }
+    Engine(String path, String variant) throws Exception {
+        VariantConfig.require(variant);
         // On some Android 14/15 devices a child ELF extracted from the APK
-        // exits immediately when executed directly. Invoke the 64-bit system
+        // exits immediately when executed directly. Invoke the matching 32/64-bit system
         // linker explicitly and expose the APK native-library directory so
         // libc++_shared.so is resolved for the child process.
         ProcessBuilder launcher;
         File engineFile=new File(path);
         File nativeDir=engineFile.getParentFile();
-        File linker=new File("/system/bin/linker64");
+        boolean elf64=true;
+        if(path.endsWith("libfairy.so"))try(InputStream elf=new FileInputStream(engineFile)){
+            byte[] header=new byte[5];if(elf.read(header)==5)elf64=header[4]==2;
+        }
+        File linker=new File(elf64?"/system/bin/linker64":"/system/bin/linker");
         if (linker.isFile() && path.endsWith("libfairy.so"))
             launcher=new ProcessBuilder(linker.getAbsolutePath(),path);
         else
@@ -40,12 +49,36 @@ final class Engine {
         }, "uci-reader");
         reader.setDaemon(true); reader.start();
         try {
-            send("uci"); until("uciok", 30000, null);
-            send("setoption name UCI_Variant value janggi");
+            send("uci"); until("uciok", 30000, line -> {
+                if (line.startsWith("option name UCI_Variant ")) {
+                    String[] parts=line.split(" var ");
+                    for (int i=1;i<parts.length;i++) supportedVariants.add(parts[i].trim());
+                }
+            });
             send("setoption name Use NNUE value false");
-            ready();
+            setVariant(variant);
         } catch (Exception ex) { close(); throw ex; }
     }
+    /** Call on the controller's serial worker. stop() may be called from UI.
+     * The response lock waits for an active search to consume its bestmove. */
+    State setVariant(String selected) throws Exception {
+        VariantConfig.require(selected);
+        if (!supportedVariants.contains(selected)) throw new IOException("엔진이 지원하지 않는 규칙: " + selected);
+        stop();
+        synchronized (responseLock) {
+            send("setoption name UCI_Variant value " + selected);
+            ready();
+            send("ucinewgame");
+            send("position startpos");
+            ready();
+            State initial=state();
+            if (!selected.equals(initial.variant) || initial.startFen==null || !initial.ongoing())
+                throw new IOException("장기 규칙 초기화 실패: " + selected);
+            variant=selected;
+            return initial;
+        }
+    }
+    String variant() { return variant; }
     synchronized void send(String s) throws IOException {
         if (closed) throw new IOException("엔진이 종료되었습니다");
         writer.write(s); writer.newLine(); writer.flush();
@@ -100,12 +133,14 @@ final class Engine {
         return State.parse(response);
     }
     String search(int ms, java.util.function.BooleanSupplier valid, Info info) throws Exception {
-        synchronized (this) {
-            if (!valid.getAsBoolean()) return null;
-            send("go movetime " + ms);
+        synchronized (responseLock) {
+            synchronized (this) {
+                if (!valid.getAsBoolean()) return null;
+                send("go movetime " + ms);
+            }
+            String line = until("bestmove ", ms + 30000L, info);
+            return line.split(" +")[1];
         }
-        String line = until("bestmove ", ms + 30000L, info);
-        return line.split(" +")[1];
     }
     synchronized void close() {
         if (closed) return;
@@ -113,7 +148,7 @@ final class Engine {
         closed=true; process.destroy();
     }
     static final class State {
-        String fen, result, reason;
+        String fen, result, reason, variant, startFen;
         boolean white, check, bikjang;
         final ArrayList<String> legal=new ArrayList<>();
         boolean ongoing() { return "ongoing".equals(result); }
@@ -128,6 +163,7 @@ final class Engine {
                         throw new IOException("중복 엔진 국면 응답");
                 }
             }
+            s.variant=fields.get("appvariant");s.startFen=fields.get("appstartfen");
             s.fen=fields.get("appfen");s.result=fields.get("appresult");s.reason=fields.get("appreason");
             if (s.fen==null || !s.fen.matches("\\S+ [wb] .*" )
                 || !Arrays.asList("ongoing","win","loss","draw").contains(s.result)
