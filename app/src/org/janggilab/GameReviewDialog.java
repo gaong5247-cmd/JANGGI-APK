@@ -16,7 +16,8 @@ final class GameReviewDialog {
     private BoardView board;
     private ReviewGraphView graph;
     private TextView heading,coach,detail,puzzle;
-    private Button retry,solution,showLine,passMove;\n    private int lineStep;
+    private Button retry,solution,showLine,passMove;
+    private int lineStep;
     private int index;
     private boolean retryMode,showSolution;
 
