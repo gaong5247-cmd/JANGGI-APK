@@ -16,7 +16,7 @@ final class GameReviewDialog {
     private BoardView board;
     private ReviewGraphView graph;
     private TextView heading,coach,detail,puzzle;
-    private Button retry,solution;
+    private Button retry,solution,showLine;\n    private int lineStep;
     private int index;
     private boolean retryMode,showSolution;
 
@@ -77,9 +77,10 @@ final class GameReviewDialog {
         root.addView(nav);
 
         LinearLayout actions=row();
-        retry=button("Retry · 직접 풀기",this::retry);
-        solution=button("해답 보기",()->{retryMode=false;showSolution=true;show(index);});
-        add(actions,retry);add(actions,solution);root.addView(actions);
+        retry=button("Retry",this::retry);
+        solution=button("Best · 해답",()->{retryMode=false;showSolution=true;show(index);});
+        showLine=button("Show · 수순",this::playLineStep);
+        add(actions,retry);add(actions,solution);add(actions,showLine);root.addView(actions);
 
         TextView note=text("정확도와 분류는 Fairy-Stockfish 평가를 승리 기대값으로 변환한 장기 연구실의 로컬 추정치입니다. Chess.com의 비공개 CAPS2/레이팅 모델과 동일한 값은 아닙니다.",9,MainActivity.MUTED);
         note.setPadding(dp(4),dp(9),dp(4),0);root.addView(note);
@@ -91,6 +92,7 @@ final class GameReviewDialog {
 
     private void show(int next){
         index=Math.max(0,Math.min(result.items.size()-1,next));
+        lineStep=0;if(showLine!=null)showLine.setText("Show · 수순");
         GameReview.Item item=result.items.get(index);
         graph.selected(index);
         board.fen(item.fenBefore);
@@ -126,8 +128,8 @@ final class GameReviewDialog {
                 board.selected="";board.targets.clear();
                 if(move.equals(item.bestMove)){
                     retryMode=false;showSolution=true;
-                    puzzle.setText("정답! "+move+"가 이 국면의 최선수입니다.");
                     show(index);
+                    puzzle.setText("정답! "+move+"가 이 국면의 최선수입니다.");
                 }else{
                     if(move.equals(item.playedMove))
                         puzzle.setText("이 수는 실전에서 둔 "+item.kind.symbol+" "+item.kind.label+"입니다. 다른 수를 찾아보세요.");
@@ -143,6 +145,26 @@ final class GameReviewDialog {
             if(s!=null&&s[0].equals(square)&&!s[0].equals(s[1]))board.targets.add(s[1]);
         }
         board.invalidate();
+    }
+
+    private void playLineStep(){
+        retryMode=false;showSolution=false;board.selected="";board.targets.clear();board.hint="";
+        GameReview.Item item=result.items.get(index);
+        String[] line=item.bestLine.trim().isEmpty()?new String[0]:item.bestLine.trim().split(" +");
+        if(line.length==0){puzzle.setText("표시할 추천 수순이 없습니다.");return;}
+        if(lineStep<=0||lineStep>=line.length){
+            board.fen(item.fenBefore);board.last=index>0?result.items.get(index-1).playedMove:"";lineStep=0;
+        }
+        String move=line[lineStep];
+        String[] squares=BoardView.splitMove(move);
+        if(squares==null){puzzle.setText("수순 표기 오류: "+move);return;}
+        if(!squares[0].equals(squares[1])){
+            char moving=board.piece(squares[0]);
+            board.setPiece(squares[0],' ');board.setPiece(squares[1],moving);
+        }
+        board.last=move;lineStep++;board.invalidate();
+        puzzle.setText("추천 수순 "+lineStep+"/"+line.length+" · "+move);
+        showLine.setText(lineStep>=line.length?"수순 처음":"Show ▶");
     }
 
     private void nextKey(){
