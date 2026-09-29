@@ -16,7 +16,7 @@ final class GameReviewDialog {
     private BoardView board;
     private ReviewGraphView graph;
     private TextView heading,coach,detail,puzzle;
-    private Button retry,solution,showLine;\n    private int lineStep;
+    private Button retry,solution,showLine,passMove;\n    private int lineStep;
     private int index;
     private boolean retryMode,showSolution;
 
@@ -78,9 +78,10 @@ final class GameReviewDialog {
 
         LinearLayout actions=row();
         retry=button("Retry",this::retry);
+        passMove=button("한 수 쉼",this::puzzlePass);
         solution=button("Best · 해답",()->{retryMode=false;showSolution=true;show(index);});
         showLine=button("Show · 수순",this::playLineStep);
-        add(actions,retry);add(actions,solution);add(actions,showLine);root.addView(actions);
+        add(actions,retry);add(actions,passMove);add(actions,solution);add(actions,showLine);root.addView(actions);
 
         TextView note=text("정확도와 분류는 Fairy-Stockfish 평가를 승리 기대값으로 변환한 장기 연구실의 로컬 추정치입니다. Chess.com의 비공개 CAPS2/레이팅 모델과 동일한 값은 아닙니다.",9,MainActivity.MUTED);
         note.setPadding(dp(4),dp(9),dp(4),0);root.addView(note);
@@ -109,7 +110,10 @@ final class GameReviewDialog {
             item.playedMove,item.playedScore,item.bestMove,item.bestScore,
             item.bestExpected*100,item.playedExpected*100,item.loss*100,item.bestLine));
         if(!retryMode)puzzle.setText(showSolution?"금색 화살표가 엔진 추천수입니다.":"Retry를 누르면 이 장면을 퍼즐처럼 다시 풀 수 있습니다.");
-        retry.setText(retryMode?"퍼즐 취소":"Retry · 직접 풀기");
+        retry.setText(retryMode?"퍼즐 취소":"Retry");
+        String pass=passFor(item);
+        passMove.setVisibility(retryMode&&!pass.isEmpty()?View.VISIBLE:View.GONE);
+        passMove.setEnabled(retryMode&&!pass.isEmpty());
         solution.setEnabled(!showSolution);
     }
 
@@ -117,6 +121,27 @@ final class GameReviewDialog {
         retryMode=!retryMode;showSolution=false;
         puzzle.setText(retryMode?"최선수를 직접 찾아보세요. 기물을 누르면 합법수가 표시됩니다.":"퍼즐 모드를 종료했습니다.");
         show(index);
+    }
+
+    private String passFor(GameReview.Item item){
+        for(String move:item.legal){
+            String[] s=BoardView.splitMove(move);
+            if(s!=null&&s[0].equals(s[1]))return move;
+        }
+        return "";
+    }
+
+    private void puzzlePass(){
+        if(!retryMode)return;
+        GameReview.Item item=result.items.get(index);
+        String pass=passFor(item);
+        if(pass.isEmpty())return;
+        if(pass.equals(item.bestMove)){
+            retryMode=false;showSolution=true;show(index);
+            puzzle.setText("정답! 이 국면의 최선은 한 수 쉬는 것입니다.");
+        }else{
+            puzzle.setText("한 수 쉴 수는 있지만 최선수는 아닙니다. 다른 수를 찾아보세요.");
+        }
     }
 
     private void puzzleTap(String square){
