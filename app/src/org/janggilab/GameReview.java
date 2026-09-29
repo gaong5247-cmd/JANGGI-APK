@@ -265,7 +265,7 @@ final class GameReview {
 
     private static boolean isGoodSacrifice(String fen,String[] pv,double bestEp){
         if(pv.length<2||bestEp<.48)return false;
-        String[] first=BoardView.splitMove(pv[0]),reply=BoardView.splitMove(pv[1]);
+        String[] first=splitMove(pv[0]),reply=splitMove(pv[1]);
         if(first==null||reply==null||first[0].equals(first[1]))return false;
         if(!reply[1].equals(first[1]))return false;
         char moving=pieceAt(fen,first[0]),captured=pieceAt(fen,first[1]);
@@ -274,7 +274,7 @@ final class GameReview {
     }
 
     static char pieceAt(String fen,String square){
-        int[] q=BoardView.parse(square);
+        int[] q=parseSquare(square);
         if(q[0]<0)return ' ';
         String[] rows=fen.split(" ")[0].split("/");
         int targetRow=9-q[1];
@@ -286,6 +286,17 @@ final class GameReview {
             file++;
         }
         return ' ';
+    }
+
+    static String[] splitMove(String move){
+        if(move==null||!move.matches("[a-i](10|[1-9])[a-i](10|[1-9])"))return null;
+        int cut=move.charAt(2)=='0'?3:2;
+        return new String[]{move.substring(0,cut),move.substring(cut)};
+    }
+
+    static int[] parseSquare(String square){
+        try{return new int[]{square.charAt(0)-'a',Integer.parseInt(square.substring(1))-1};}
+        catch(Exception ex){return new int[]{-1,-1};}
     }
 
     static int pieceValue(char piece){
