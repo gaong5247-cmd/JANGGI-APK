@@ -31,7 +31,7 @@ public final class MainActivity extends Activity {
     Engine.State state;
     BoardView board;
     TextView status, turn, eval, details, history, badge;
-    Button run, passButton;
+    Button run, passButton, reviewButton;
     String variant=VariantConfig.IDS[0], variantStart=START;
     MoveSounds sounds;
     int soundCursor=-1;
@@ -46,6 +46,11 @@ public final class MainActivity extends Activity {
     volatile boolean networkBusy;
     String networkName="기본 평가";
     File executable;
+    volatile boolean reviewing;
+    GameReview.Result cachedReview;
+    String cachedReviewKey="";
+    AlertDialog reviewProgress;
+    TextView reviewProgressText;
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
@@ -101,7 +106,7 @@ public final class MainActivity extends Activity {
         root.addView(board,new LinearLayout.LayoutParams(-1,Math.min((int)(width*1.1),dp(470))));
         LinearLayout bar=row();addButton(bar,button("◀ 이전",()->navigate(-1)));addButton(bar,button("다음 ▶",()->navigate(1)));passButton=button("한 수 쉼",this::pass);passButton.setEnabled(false);addButton(bar,passButton);addButton(bar,button("뒤집기",()->{board.flipped=!board.flipped;board.invalidate();}));root.addView(bar);
         LinearLayout controls=row();run=button("분석 시작",()->{if(!initialized||networkBusy)return;active=!active;refresh(active);});run.setTextColor(ACCENT);addButton(controls,run);addButton(controls,button("새 대국",this::newGame));addButton(controls,button("기보 공유",this::share));root.addView(controls);
-        LinearLayout editRow=row();addButton(editRow,button("포지션 편집 · 자유 배치",this::positionEditor));root.addView(editRow);
+        LinearLayout editRow=row();reviewButton=button("게임 리뷰",this::reviewGame);reviewButton.setTextColor(ACCENT);addButton(editRow,reviewButton);addButton(editRow,button("포지션 편집 · 자유 배치",this::positionEditor));root.addView(editRow);
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(14),dp(12),dp(14),dp(12));panel.setBackground(bg(CARD,14));
         eval=text("국면을 깊이 읽어보세요",20,ACCENT);panel.addView(eval);details=text("추천수 · 평가 · 탐색 깊이 · 후보 수순\n분석 시작을 누르면 현재 국면을 탐색합니다.",12,MUTED);details.setLineSpacing(dp(3),1);details.setTextIsSelectable(true);panel.addView(details);root.addView(panel);
         status=text("Fairy-Stockfish를 시작하는 중…",12,MUTED);status.setPadding(dp(3),dp(10),0,dp(8));root.addView(status);
@@ -263,6 +268,92 @@ public final class MainActivity extends Activity {
         dialog.setOnShowListener(d->{dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String problem=validateEditedPosition(edit);if(problem!=null){Toast.makeText(this,problem,Toast.LENGTH_LONG).show();return;}initialFen=edit.toFen(side.getSelectedItemPosition()==0);moves.clear();cursor=0;displayedFen="";state=null;dialog.dismiss();refresh(false);});});
         dialog.show();
     }
+    String reviewKey(){
+        return variant+"\n"+initialFen+"\n"+String.join(" ",moves)+"\n"+prefs.getString("nnuePath","");
+    }
+    void reviewGame(){
+        if(!initialized||networkBusy){Toast.makeText(this,"엔진 준비 중입니다",Toast.LENGTH_SHORT).show();return;}
+        if(reviewing){stopReview();return;}
+        if(moves.isEmpty()){Toast.makeText(this,"먼저 한 수 이상 둔 기보가 필요합니다",Toast.LENGTH_LONG).show();return;}
+        String key=reviewKey();
+        boolean cached=cachedReview!=null&&key.equals(cachedReviewKey);
+        String[] choices=cached
+            ?new String[]{"저장된 리뷰 열기","빠른 리뷰 · 다시 분석","정밀 리뷰 · 더 깊게 다시 분석"}
+            :new String[]{"빠른 리뷰 · 가볍게 전체 확인","정밀 리뷰 · 더 깊게 다시 분석"};
+        new AlertDialog.Builder(this).setTitle("게임 리뷰")
+            .setMessage("현재 기보의 사람 수, 엔진 수, 분석에서 이어 둔 수를 모두 다시 봅니다.")
+            .setItems(choices,(d,which)->{
+                if(cached&&which==0){GameReviewDialog.show(this,cachedReview);return;}
+                int choice=cached?which-1:which;startReview(choice==0?180:500);
+            })
+            .setNegativeButton("취소",null).show();
+    }
+    void showReviewProgress(int total){
+        closeReviewProgress();
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(24),dp(14),dp(24),dp(8));
+        reviewProgressText=text("기보를 다시 분석하고 있습니다 · 0/"+total,14,0xff233F3A);
+        box.addView(reviewProgressText);
+        ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(48));lp.setMargins(0,dp(8),0,0);
+        box.addView(spinner,lp);
+        reviewProgress=new AlertDialog.Builder(this).setTitle("게임 리뷰 분석 중")
+            .setView(box).setMessage("수마다 Fairy-Stockfish를 다시 돌리므로 기보가 길면 시간이 걸립니다.")
+            .setNegativeButton("중지",(d,w)->stopReview()).setCancelable(false).create();
+        reviewProgress.show();
+    }
+    void closeReviewProgress(){
+        if(reviewProgress!=null){
+            try{reviewProgress.dismiss();}catch(Exception ignored){}
+            reviewProgress=null;reviewProgressText=null;
+        }
+    }
+    void stopReview(){
+        if(!reviewing)return;
+        reviewing=false;cancel();closeReviewProgress();
+        if(reviewButton!=null)reviewButton.setText("게임 리뷰");
+        if(status!=null)status.setText("게임 리뷰를 중지했습니다");
+    }
+
+    void startReview(int movetime){
+        if(reviewing||moves.isEmpty())return;
+        active=false;soundCursor=-1;
+        final int id=cancel();
+        reviewing=true;reviewButton.setText("■ 리뷰 중지");
+        final String fen=initialFen,key=reviewKey();
+        final ArrayList<String> snapshot=new ArrayList<>(moves);
+        final int th=threads,ha=hash,total=snapshot.size();
+        status.setText("게임 리뷰 준비 중 · 0/"+total);
+        showReviewProgress(total);
+        worker.execute(()->{
+            try{
+                GameReview.Result result=GameReview.analyze(a,fen,snapshot,movetime,th,ha,
+                    ()->id==generation.get(),
+                    (done,all)->main.post(()->{if(id==generation.get()&&reviewing){
+                        status.setText("게임 리뷰 분석 중 · "+done+"/"+all);
+                        if(reviewProgressText!=null)reviewProgressText.setText("기보를 다시 분석하고 있습니다 · "+done+"/"+all);
+                    }}));
+                if(id!=generation.get())return;
+                main.post(()->{
+                    if(destroyed||id!=generation.get())return;
+                    reviewing=false;closeReviewProgress();reviewButton.setText("게임 리뷰");
+                    cachedReview=result;cachedReviewKey=key;
+                    status.setText("게임 리뷰 완료 · 핵심 수를 눌러 다시 풀어볼 수 있습니다");
+                    GameReviewDialog.show(this,result);
+                });
+            }catch(CancellationException ignored){
+                main.post(()->{if(!destroyed&&id==generation.get()){reviewing=false;closeReviewProgress();reviewButton.setText("게임 리뷰");status.setText("게임 리뷰를 중지했습니다");}});
+            }catch(Exception ex){
+                main.post(()->{
+                    if(destroyed||id!=generation.get())return;
+                    reviewing=false;closeReviewProgress();reviewButton.setText("게임 리뷰");
+                    status.setText("게임 리뷰 실패: "+ex.getMessage());
+                    new AlertDialog.Builder(this).setTitle("게임 리뷰 실패").setMessage(ex.getMessage()).setPositiveButton("확인",null).show();
+                });
+            }
+        });
+    }
+
     Spinner spinner(String[] options,int selected){Spinner s=new Spinner(this);ArrayAdapter<String> ad=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,options);s.setAdapter(ad);s.setSelection(selected);return s;}
     void label(LinearLayout l,String title,View input){TextView t=text(title,14,0xff233F3A);t.setPadding(dp(3),dp(10),0,0);l.addView(t);l.addView(input,new LinearLayout.LayoutParams(-1,dp(44)));}
     void newGame(){
@@ -399,6 +490,6 @@ public final class MainActivity extends Activity {
     void licenses(){try{java.io.InputStream in=getAssets().open("COPYING");java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)out.write(buf,0,n);in.close();TextView t=text(out.toString("UTF-8"),12,0xff233F3A);t.setPadding(dp(16),dp(12),dp(16),dp(12));ScrollView s=new ScrollView(this);s.addView(t);new AlertDialog.Builder(this).setTitle("GNU GPL v3").setView(s).setPositiveButton("닫기",null).show();}catch(Exception e){error(e);}}
     void share(){if(state==null)return;String content="[장기 연구실 / Fairy-Stockfish]\nVariant: "+variant+"\nInitial FEN: "+initialFen+"\nMoves: "+String.join(" ",moves)+"\nCursor: "+cursor+"\nCurrent FEN: "+state.fen+"\n";Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");i.putExtra(Intent.EXTRA_TEXT,content);startActivity(Intent.createChooser(i,"기보 공유"));}
     @Override protected void onResume(){super.onResume();if(initialized)refresh(false);}
-    @Override protected void onPause(){super.onPause();active=false;soundCursor=-1;cancel();if(sounds!=null)sounds.pause();persist();if(run!=null)run.setText(mode.equals("analysis")?"분석 시작":"대국 시작");}
+    @Override protected void onPause(){super.onPause();active=false;reviewing=false;closeReviewProgress();soundCursor=-1;cancel();if(sounds!=null)sounds.pause();persist();if(run!=null)run.setText(mode.equals("analysis")?"분석 시작":"대국 시작");if(reviewButton!=null)reviewButton.setText("게임 리뷰");}
     @Override protected synchronized void onDestroy(){destroyed=true;cancel();if(sounds!=null)sounds.close();if(a!=null)a.close();if(b!=null)b.close();worker.shutdownNow();super.onDestroy();}
 }

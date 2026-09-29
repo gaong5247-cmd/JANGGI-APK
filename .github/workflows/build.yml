@@ -25,8 +25,10 @@ jobs:
           python3 tests/variant_regression.py native/Fairy-Stockfish/src/stockfish | tee build/variants.json
           python3 tests/engine_smoke.py native/Fairy-Stockfish/src/stockfish | tee build/smoke.json
           python3 tests/janggi_regression.py native/Fairy-Stockfish/src/stockfish | tee build/regression.json
-          javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java tests/EngineIntegration.java
+          javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java app/src/org/janggilab/GameReview.java tests/EngineIntegration.java tests/GameReviewUnit.java tests/GameReviewIntegration.java
           java -cp build/classes org.janggilab.EngineIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" | tee build/java-results.txt
+          java -cp build/classes org.janggilab.GameReviewUnit | tee build/review-results.txt
+          java -cp build/classes org.janggilab.GameReviewIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" | tee build/review-integration.txt
       - name: Upstream engine checks
         working-directory: native/Fairy-Stockfish/src
         run: |
@@ -55,7 +57,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - name: Configure preinstalled Android SDK
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
       - name: Build armv7, armv8, x86_64 and Universal APKs
         run: |
