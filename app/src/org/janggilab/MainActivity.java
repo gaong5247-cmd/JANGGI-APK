@@ -276,11 +276,16 @@ public final class MainActivity extends Activity {
         }
         if(moves.isEmpty()){Toast.makeText(this,"먼저 한 수 이상 둔 기보가 필요합니다",Toast.LENGTH_LONG).show();return;}
         String key=reviewKey();
-        if(cachedReview!=null&&key.equals(cachedReviewKey)){GameReviewDialog.show(this,cachedReview);return;}
-        String[] choices={"빠른 리뷰 · 가볍게 전체 확인","정밀 리뷰 · 더 깊게 다시 분석"};
+        boolean cached=cachedReview!=null&&key.equals(cachedReviewKey);
+        String[] choices=cached
+            ?new String[]{"저장된 리뷰 열기","빠른 리뷰 · 다시 분석","정밀 리뷰 · 더 깊게 다시 분석"}
+            :new String[]{"빠른 리뷰 · 가볍게 전체 확인","정밀 리뷰 · 더 깊게 다시 분석"};
         new AlertDialog.Builder(this).setTitle("게임 리뷰")
             .setMessage("현재 기보의 사람 수, 엔진 수, 분석에서 이어 둔 수를 모두 다시 봅니다.")
-            .setItems(choices,(d,which)->startReview(which==0?180:500))
+            .setItems(choices,(d,which)->{
+                if(cached&&which==0){GameReviewDialog.show(this,cachedReview);return;}
+                int choice=cached?which-1:which;startReview(choice==0?180:500);
+            })
             .setNegativeButton("취소",null).show();
     }
     void startReview(int movetime){
