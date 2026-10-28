@@ -120,6 +120,8 @@ jobs:
           python3 scripts/build.py
       - name: Verify ABI and ELF page alignment
         run: python3 tests/verify_apks.py
+      - name: Archive pinned AGPL corresponding sources
+        run: python3 scripts/package_stockless_source.py
       - uses: actions/upload-artifact@v4
         with:
           name: JanggiLab-Android
