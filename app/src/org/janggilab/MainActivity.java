@@ -27,7 +27,10 @@ public final class MainActivity extends Activity {
     final AtomicInteger generation=new AtomicInteger();
     final Handler main=new Handler(Looper.getMainLooper());
     volatile Engine a,b;
-    volatile boolean initialized, destroyed;
+    volatile SearchEngine searchA, searchB;
+    String engineAID=EngineProfile.FAIRY, engineBID=EngineProfile.FAIRY;
+    volatile boolean initialized, destroyed, recovering;
+    int recoveryAttempts=0;
     Engine.State state;
     BoardView board;
     TextView status, turn, eval, details, history, badge;
@@ -52,6 +55,8 @@ public final class MainActivity extends Activity {
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
         prefs=getSharedPreferences("janggi",0);
         variant=VariantConfig.saved(prefs.getString("variant",VariantConfig.IDS[0]));
+        engineAID=EngineProfile.saved(prefs.getString("engineA",EngineProfile.FAIRY));
+        engineBID=EngineProfile.saved(prefs.getString("engineB",EngineProfile.FAIRY));
         sounds=new MoveSounds(this);
         initialFen=prefs.getString("initial",START);skillA=prefs.getInt("skillA",20);skillB=prefs.getInt("skillB",12);
         humanWhite=prefs.getBoolean("humanWhite",true);
@@ -67,10 +72,20 @@ public final class MainActivity extends Activity {
                 String path=prefs.getString("nnuePath", "");
                 String notice="";
                 try { replaceEngines(exe,path); }
-                catch(Exception badNet) {
-                    if(path.isEmpty())throw badNet;
-                    prefs.edit().remove("nnuePath").remove("nnueName").apply();
-                    replaceEngines(exe,"");notice="저장된 NNUE를 읽지 못해 기본 평가로 복구했습니다";
+                catch(Exception problem) {
+                    // Retain a working NNUE when only a custom search binary failed.
+                    engineAID=EngineProfile.FAIRY;
+                    engineBID=EngineProfile.FAIRY;
+                    prefs.edit().putString("engineA",engineAID).putString("engineB",engineBID).apply();
+                    try {
+                        replaceEngines(exe,path);
+                        notice="선택한 엔진을 시작할 수 없어 Fairy-Stockfish로 복구했습니다";
+                    } catch(Exception fail) {
+                        if(path.isEmpty())throw fail;
+                        prefs.edit().remove("nnuePath").remove("nnueName").apply();
+                        replaceEngines(exe,"");
+                        notice="저장된 NNUE도 읽을 수 없어 기본 평가로 복구했습니다";
+                    }
                 }
                 if(destroyed)return;
                 final String message=notice;
@@ -100,7 +115,7 @@ public final class MainActivity extends Activity {
         int width=getResources().getDisplayMetrics().widthPixels-dp(28);
         root.addView(board,new LinearLayout.LayoutParams(-1,Math.min((int)(width*1.1),dp(470))));
         LinearLayout bar=row();addButton(bar,button("◀ 이전",()->navigate(-1)));addButton(bar,button("다음 ▶",()->navigate(1)));passButton=button("한 수 쉼",this::pass);passButton.setEnabled(false);addButton(bar,passButton);addButton(bar,button("뒤집기",()->{board.flipped=!board.flipped;board.invalidate();}));root.addView(bar);
-        LinearLayout controls=row();run=button("분석 시작",()->{if(!initialized||networkBusy)return;active=!active;refresh(active);});run.setTextColor(ACCENT);addButton(controls,run);addButton(controls,button("새 대국",this::newGame));addButton(controls,button("기보 공유",this::share));root.addView(controls);
+        LinearLayout controls=row();run=button("분석 시작",()->{if(networkBusy)return;if(!initialized){recover(true);return;}active=!active;refresh(active);});run.setTextColor(ACCENT);addButton(controls,run);addButton(controls,button("새 대국",this::newGame));addButton(controls,button("기보 공유",this::share));root.addView(controls);
         LinearLayout editRow=row();addButton(editRow,button("포지션 편집 · 자유 배치",this::positionEditor));root.addView(editRow);
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(14),dp(12),dp(14),dp(12));panel.setBackground(bg(CARD,14));
         eval=text("국면을 깊이 읽어보세요",20,ACCENT);panel.addView(eval);details=text("추천수 · 평가 · 탐색 깊이 · 후보 수순\n분석 시작을 누르면 현재 국면을 탐색합니다.",12,MUTED);details.setLineSpacing(dp(3),1);details.setTextIsSelectable(true);panel.addView(details);root.addView(panel);
@@ -110,8 +125,13 @@ public final class MainActivity extends Activity {
         setContentView(scroll);
     }
     void updateModes(){for(int i=0;i<3;i++)modes[i].setTextColor(mode.equals(new String[]{"analysis","play","arena"}[i])?ACCENT:MUTED);}
-    void persist(){prefs.edit().putString("variant",variant).putString("initial",initialFen).putString("moves",String.join(" ",moves)).putInt("cursor",cursor).putInt("skillA",skillA).putInt("skillB",skillB).putInt("msA",msA).putInt("msB",msB).putInt("threads",threads).putInt("hash",hash).putBoolean("humanWhite",humanWhite).apply();}
-    int cancel(){int id=generation.incrementAndGet();if(a!=null)a.stop();if(b!=null)b.stop();return id;}
+    void persist(){prefs.edit().putString("variant",variant).putString("initial",initialFen).putString("moves",String.join(" ",moves)).putInt("cursor",cursor).putInt("skillA",skillA).putInt("skillB",skillB).putInt("msA",msA).putInt("msB",msB).putInt("threads",threads).putInt("hash",hash).putBoolean("humanWhite",humanWhite).putString("engineA",engineAID).putString("engineB",engineBID).apply();}
+    int cancel(){
+        int id=generation.incrementAndGet();
+        if(a!=null)a.stop();if(b!=null)b.stop();
+        if(searchA!=null)searchA.stop();if(searchB!=null)searchB.stop();
+        return id;
+    }
     void refresh(boolean search){
         if(!initialized||networkBusy)return;
         final int id=cancel();state=null;passButton.setEnabled(false);eval.setText("현재 국면 · 분석 대기");details.setText("M 표시는 외통·규칙승의 탐색 예측이며 현재 종국 판정이 아닙니다.");board.hint="";board.selected="";board.targets.clear();board.invalidate();Arrays.fill(pvs,"");
@@ -129,16 +149,23 @@ public final class MainActivity extends Activity {
                 boolean analysis=currentMode.equals("analysis");
                 if(currentMode.equals("play")&&st.white==humanWhite)return;
                 Engine e=analysis||st.white?a:b;
-                e.configure(analysis?20:st.white?sa:sb,th,ha,analysis?3:1);e.position(fen,snapshot);
+                SearchEngine external=analysis||st.white?searchA:searchB;
+                int strength=analysis?20:st.white?sa:sb, candidates=analysis?3:1;
+                if(external==null){e.configure(strength,th,ha,candidates);e.position(fen,snapshot);}
+                else {external.configure(strength,th,ha,candidates);external.position(fen,snapshot);}
                 if(id!=generation.get())return;
                 main.post(()->{if(id==generation.get())status.setText(analysis?"분석 중 · 평가값은 둘 차례 기준":(st.white?"초 A":"한 B")+" 엔진 생각 중…");});
                 long[] tick={0};
                 // Long, cancellable analysis; arena uses the selected per-move time.
-                String best=e.search(analysis?600000:st.white?ta:tb,()->id==generation.get(),line->{
+                java.util.function.Consumer<String> feed=line->{
                     if(id!=generation.get()||!line.startsWith("info ")||!line.contains(" pv "))return;
                     long now=System.currentTimeMillis();if(now-tick[0]<80&&!line.contains("multipv 3"))return;tick[0]=now;
                     main.post(()->{if(id==generation.get())info(line);});
-                });
+                };
+                int thinkTime=analysis?600000:st.white?ta:tb;
+                String best=external==null
+                    ?e.search(thinkTime,()->id==generation.get(),feed::accept)
+                    :external.search(thinkTime,()->id==generation.get(),feed::accept);
                 if(id!=generation.get())return;
                 main.post(()->{
                     if(id!=generation.get())return;
@@ -155,11 +182,11 @@ public final class MainActivity extends Activity {
         state=st;
         passButton.setEnabled(VariantConfig.allowsPass(variant)&&st.ongoing()&&!mode.equals("arena")
             &&(!mode.equals("play")||st.white==humanWhite)&&st.legal.stream().anyMatch(m->{String[] q=BoardView.splitMove(m);return q!=null&&q[0].equals(q[1]);}));
-        badge.setText("FAIRY-STOCKFISH · "+VariantConfig.NAMES[VariantConfig.index(variant)]);
+        badge.setText(EngineProfile.title(engineAID)+" / "+EngineProfile.title(engineBID)+" · "+VariantConfig.NAMES[VariantConfig.index(variant)]);
         board.fen(st.fen);board.last=cursor>0?moves.get(cursor-1):"";board.invalidate();
         String side=st.white?"초":"한";
         turn.setText(side+" 차례"+(st.check?" · 장군":" · 장군 아님")+(VariantConfig.hasBikjang(variant)&&st.bikjang?" · 빅장 제안":"")+"     "+cursor+"수");
-        status.setText("인터넷 없이 사용 중 · "+(mode.equals("analysis")?"기물을 눌러 분석 수순을 진행할 수 있습니다":mode.equals("play")?"내 진영: "+(humanWhite?"초":"한"):"초 A / 한 B · 독립 엔진"));
+        status.setText("인터넷 없이 사용 중 · "+(mode.equals("analysis")?"기물을 눌러 분석 수순을 진행할 수 있습니다":mode.equals("play")?"내 진영: "+(humanWhite?"초":"한"):"초 "+EngineProfile.title(engineAID)+" / 한 "+EngineProfile.title(engineBID)));
         if(!st.result.equals("ongoing")){
             active=false;run.setText("종료");String result=st.result.equals("draw")?"무승부":(st.result.equals("win")==st.white?"초 승":"한 승");turn.setText("대국 종료 · "+result+" · "+resultReason(st));status.setText("Fairy-Stockfish 장기 규칙 판정");eval.setText("종국 · "+resultReason(st));details.setText("현재 보드와 기보에 따른 판정입니다.");board.hint="";board.invalidate();
         }
@@ -204,7 +231,60 @@ public final class MainActivity extends Activity {
     }
     void navigate(int delta){if(networkBusy)return;soundCursor=-1;if(cursor+delta<0||cursor+delta>moves.size())return;cursor+=delta;active=false;eval.setText("선택한 국면");details.setText("분석 시작으로 현재 국면을 평가할 수 있습니다.");refresh(false);}
     void pass(){if(networkBusy||!VariantConfig.allowsPass(variant)||state==null||!state.ongoing()||mode.equals("arena")||(mode.equals("play")&&state.white!=humanWhite))return;for(String m:state.legal){String[] s=BoardView.splitMove(m);if(s!=null&&s[0].equals(s[1])){commit(m);return;}}Toast.makeText(this,"현재 국면에서는 한 수 쉴 수 없습니다",0).show();}
-    void error(Exception e){main.post(()->{if(destroyed)return;active=false;if(run!=null)run.setText("다시 시작");if(status!=null)status.setText("오류: "+e.getMessage()+" · 계속되면 앱을 다시 열어주세요");});}
+    void error(Exception e){
+        main.post(()->{
+            if(destroyed)return;
+            active=false;
+            if(status!=null)status.setText("엔진 오류: "+e.getMessage());
+            if(!networkBusy)recover(false);
+        });
+    }
+    void recover(boolean manual){
+        if(destroyed||networkBusy||recovering)return;
+        if(!manual&&recoveryAttempts>=2){
+            initialized=false;
+            if(run!=null)run.setText("복구 다시 시도");
+            if(status!=null)status.setText("반복 오류로 자동 복구 중단 · 기보는 보존됩니다. 복구 다시 시도를 누르세요.");
+            return;
+        }
+        recoveryAttempts++;recovering=true;networkBusy=true;initialized=false;
+        active=false;cancel();if(run!=null)run.setText("복구 중");
+        if(status!=null)status.setText("엔진 프로세스 재시작 중 · 기보를 유지합니다");
+        worker.execute(()->{
+            String notice="";
+            try{
+                String exe=installEngineExecutable(),path=prefs.getString("nnuePath","");
+                try{replaceEngines(exe,path);}
+                catch(Exception brokenProfile){
+                    engineAID=EngineProfile.FAIRY;engineBID=EngineProfile.FAIRY;
+                    prefs.edit().putString("engineA",engineAID).putString("engineB",engineBID).apply();
+                    try{
+                        replaceEngines(exe,path);
+                        notice="추가 엔진이 작동하지 않아 기본 엔진으로 복구";
+                    }catch(Exception badNet){
+                        if(path.isEmpty())throw badNet;
+                        replaceEngines(exe,"");
+                        prefs.edit().remove("nnuePath").remove("nnueName").apply();
+                        notice="NNUE 오류로 기본 평가를 사용";
+                    }
+                }
+                final String message=notice;
+                main.post(()->{
+                    if(destroyed)return;
+                    recovering=false;networkBusy=false;initialized=true;networkName=prefs.getString("nnueName","기본 평가");
+                    refresh(false);
+                    if(!message.isEmpty())Toast.makeText(this,message,Toast.LENGTH_LONG).show();
+                });
+            }catch(Exception ex){
+                main.post(()->{
+                    if(destroyed)return;
+                    recovering=false;networkBusy=false;initialized=false;
+                    if(run!=null)run.setText("복구 다시 시도");
+                    if(status!=null)status.setText("엔진 복구 실패: "+ex.getMessage());
+                });
+            }
+        });
+    }
     String validateEditedPosition(BoardView v){
         int redKing=0,blueKing=0;
         for(int rank=1;rank<=10;rank++)for(int file=0;file<9;file++){
@@ -277,7 +357,7 @@ public final class MainActivity extends Activity {
             rows[9]=ranks[cho.getSelectedItemPosition()];fields[0]=String.join("/",rows);
             initialFen=String.join(" ",fields);
             active=false;cancel();
-            worker.execute(()->{try{a.send("ucinewgame");b.send("ucinewgame");a.ready();b.ready();}catch(Exception ex){error(ex);}});
+            worker.execute(()->{try{a.send("ucinewgame");b.send("ucinewgame");a.ready();b.ready();if(searchA!=null)searchA.newGame();if(searchB!=null)searchB.newGame();}catch(Exception ex){error(ex);}});
             moves.clear();cursor=0;active=false;eval.setText("새 대국 준비 완료");details.setText("차림을 적용했습니다. 시작 버튼을 눌러주세요.");refresh(false);
         }).show();
     }
@@ -293,42 +373,129 @@ public final class MainActivity extends Activity {
         Spinner sa=spinner(skills,skillA),sb=spinner(skills,skillB);
         int[] times={250,500,1000,2000,5000,10000};String[] timeLabels={"0.25초","0.5초","1초","2초","5초","10초"};Spinner ta=spinner(timeLabels,index(times,msA)),tb=spinner(timeLabels,index(times,msB));
         Spinner th=spinner(new String[]{"1 스레드 · 절전","2 스레드","4 스레드"},index(new int[]{1,2,4},threads));Spinner ha=spinner(new String[]{"16 MB","32 MB","64 MB","128 MB"},index(new int[]{16,32,64,128},hash));Spinner side=spinner(new String[]{"초 · 먼저 둠","한 · 나중에 둠"},humanWhite?0:1);
+        File nativeDir=new File(getApplicationInfo().nativeLibraryDir);
+        Spinner profileA=spinner(EngineProfile.labels(nativeDir),EngineProfile.index(engineAID));
+        Spinner profileB=spinner(EngineProfile.labels(nativeDir),EngineProfile.index(engineBID));
         label(l,"초 엔진 A 강도",sa);label(l,"초 A · 한 수 생각 시간",ta);label(l,"한 엔진 B 강도",sb);label(l,"한 B · 한 수 생각 시간",tb);label(l,"엔진별 CPU",th);label(l,"엔진별 해시",ha);label(l,"직접 대국 · 내 진영",side);
+        label(l,"초 A · 탐색 엔진",profileA);
+        label(l,"한 B · 탐색 엔진",profileB);
+        TextView isolation=text("규칙·종국 판정은 Fairy-Stockfish가 유지합니다. 다른 엔진의 수는 합법수와 대조합니다. DOTPROD와 사용자 엔진은 APK에 포함되고 기기에서 지원되어야 합니다.",12,0xff425B54);
+        l.addView(isolation);
         Button choose=button("장기 NNUE 파일 선택",this::chooseNetwork);l.addView(choose);
         Button reset=button("기본 평가로 복구",()->changeNetwork(null));l.addView(reset);
-        TextView current=text("현재 평가: "+networkName+"\nFairy-Stockfish용 장기 .nnue 파일을 선택하세요. 파일은 앱 내부에 복사됩니다.",12,0xff425B54);l.addView(current);
-        TextView note=text("분석은 최대 강도 · 후보수 3개로 실행됩니다.\n화면을 떠나면 탐색은 멈추고 기보는 자동 저장됩니다.\n\nFairy-Stockfish / GPL-3.0-or-later\nNNUE 선택 가능 · 기본 가중치 미포함\n엔진 대결은 같은 엔진의 서로 다른 설정 간 대결입니다.",12,0xff425B54);l.addView(note);
-        new AlertDialog.Builder(this).setTitle("연구실 설정").setView(scroll).setNegativeButton("취소",null).setNeutralButton("라이선스",(d,w)->licenses()).setPositiveButton("적용",(d,w)->{skillA=sa.getSelectedItemPosition();skillB=sb.getSelectedItemPosition();msA=times[ta.getSelectedItemPosition()];msB=times[tb.getSelectedItemPosition()];threads=new int[]{1,2,4}[th.getSelectedItemPosition()];hash=new int[]{16,32,64,128}[ha.getSelectedItemPosition()];humanWhite=side.getSelectedItemPosition()==0;sounds.enabled=soundToggle.isChecked();prefs.edit().putBoolean("sounds",sounds.enabled).apply();persist();String selected=VariantConfig.IDS[rules.getSelectedItemPosition()];if(!variant.equals(selected))changeVariant(selected);else refresh(false);}).show();
+        TextView current=text("현재 평가: "+networkName+"\nFSF 및 호환 Stockless용 장기 .nnue 파일을 선택하세요. 적용 전 실제 엔진에서 로딩 여부를 검사합니다.",12,0xff425B54);l.addView(current);
+        TextView note=text("분석은 최대 강도 · 후보수 3개로 실행됩니다.\n화면을 떠나면 탐색은 멈추고 기보는 자동 저장됩니다.\n\nFairy-Stockfish / GPL-3.0-or-later\nNNUE 선택 가능 · 기본 가중치 미포함\n엔진 A/B를 독립적으로 선택할 수 있습니다. 규칙 판정은 Fairy-Stockfish가 유지합니다.",12,0xff425B54);l.addView(note);
+        new AlertDialog.Builder(this).setTitle("연구실 설정").setView(scroll).setNegativeButton("취소",null).setNeutralButton("라이선스",(d,w)->licenses()).setPositiveButton("적용",(d,w)->{skillA=sa.getSelectedItemPosition();skillB=sb.getSelectedItemPosition();msA=times[ta.getSelectedItemPosition()];msB=times[tb.getSelectedItemPosition()];threads=new int[]{1,2,4}[th.getSelectedItemPosition()];hash=new int[]{16,32,64,128}[ha.getSelectedItemPosition()];humanWhite=side.getSelectedItemPosition()==0;sounds.enabled=soundToggle.isChecked();prefs.edit().putBoolean("sounds",sounds.enabled).apply();persist();String selected=VariantConfig.IDS[rules.getSelectedItemPosition()];
+            String selectedA=EngineProfile.IDS[profileA.getSelectedItemPosition()];
+            String selectedB=EngineProfile.IDS[profileB.getSelectedItemPosition()];
+            if(!variant.equals(selected)||!engineAID.equals(selectedA)||!engineBID.equals(selectedB))
+                changeConfiguration(selected,selectedA,selectedB);
+            else refresh(false);}).show();
     }
+    /** Ensure external rule profiles match our referee variants byte for byte. */
+    String installRulesFile() throws IOException {
+        File dst=new File(getFilesDir(),"janggilab-variants.ini");
+        try(InputStream in=getAssets().open("janggilab-variants.ini");
+            OutputStream out=new FileOutputStream(dst)){
+            byte[] buf=new byte[8192];int n;
+            while((n=in.read(buf))!=-1)out.write(buf,0,n);
+        }
+        return dst.getAbsolutePath();
+    }
+    SearchEngine createSearchEngine(String id,String forVariant,String network) throws Exception {
+        if(EngineProfile.FAIRY.equals(id))return null;
+        String executablePath=EngineProfile.locate(new File(getApplicationInfo().nativeLibraryDir),id);
+        return new SearchEngine(executablePath,id,forVariant,installRulesFile(),network);
+    }
+    /** Fully transactional A/B replacement; NNUE failure leaves the old engines alive. */
     void replaceEngines(String exe,String path)throws Exception {
         Engine nextA=null,nextB=null;
-        try {
-            nextA=new Engine(exe,variant);nextA.useNetwork(path);
-            nextB=new Engine(exe,variant);nextB.useNetwork(path);
-            String start=nextA.state().startFen;
+        SearchEngine nextSearchA=null,nextSearchB=null;
+        try{
+            nextA=new Engine(exe,variant);
+            nextA.useNetwork(EngineProfile.FAIRY.equals(engineAID)?path:"");
+            nextB=new Engine(exe,variant);
+            nextB.useNetwork(EngineProfile.FAIRY.equals(engineBID)?path:"");
+            Engine.State stateA=nextA.state(),stateB=nextB.state();
+            if(!stateA.startFen.equals(stateB.startFen))
+                throw new IOException("A/B 장기 규칙 초기 국면 불일치");
+            nextSearchA=createSearchEngine(engineAID,variant,path);
+            nextSearchB=createSearchEngine(engineBID,variant,path);
             synchronized(this){
-                variantStart=start;
-                if(destroyed)throw new IOException("화면이 종료되었습니다");
-                Engine oldA=a,oldB=b;a=nextA;b=nextB;nextA=null;nextB=null;
+                if(destroyed)throw new IOException("앱이 종료되었습니다");
+                Engine oldA=a,oldB=b;
+                SearchEngine oldSearchA=searchA,oldSearchB=searchB;
+                a=nextA;b=nextB;searchA=nextSearchA;searchB=nextSearchB;
+                nextA=null;nextB=null;nextSearchA=null;nextSearchB=null;
+                variantStart=stateA.startFen;
                 if(oldA!=null)oldA.close();if(oldB!=null)oldB.close();
+                if(oldSearchA!=null)oldSearchA.close();if(oldSearchB!=null)oldSearchB.close();
             }
-        } finally { if(nextA!=null)nextA.close();if(nextB!=null)nextB.close(); }
+        }finally{
+            if(nextA!=null)nextA.close();if(nextB!=null)nextB.close();
+            if(nextSearchA!=null)nextSearchA.close();if(nextSearchB!=null)nextSearchB.close();
+        }
     }
-    void changeVariant(String selected){
+    void changeVariant(String selected){changeConfiguration(selected,engineAID,engineBID);}
+    void changeConfiguration(String selected,String profileA,String profileB){
         if(networkBusy||!initialized)return;
+        if(!EngineProfile.FAIRY.equals(profileA)
+           &&!EngineProfile.available(new File(getApplicationInfo().nativeLibraryDir),profileA)){
+            new AlertDialog.Builder(this).setTitle("엔진 선택 불가")
+              .setMessage(EngineProfile.title(profileA)+" 실행 파일이 없거나 CPU 지원을 확인하지 못했습니다.")
+              .setPositiveButton("확인",null).show();return;
+        }
+        if(!EngineProfile.FAIRY.equals(profileB)
+           &&!EngineProfile.available(new File(getApplicationInfo().nativeLibraryDir),profileB)){
+            new AlertDialog.Builder(this).setTitle("엔진 선택 불가")
+              .setMessage(EngineProfile.title(profileB)+" 실행 파일이 없거나 CPU 지원을 확인하지 못했습니다.")
+              .setPositiveButton("확인",null).show();return;
+        }
+        final boolean changedRules=!selected.equals(variant);
         active=false;cancel();networkBusy=true;state=null;soundCursor=-1;passButton.setEnabled(false);
-        status.setText("장기 규칙 변경 중…");
-        final String previous=variant;
+        status.setText("장기 규칙 및 탐색 엔진 검증 중…");
         worker.execute(()->{
-            try {
-                Engine.State sa=a.setVariant(selected),sb=b.setVariant(selected);
-                if(!sa.startFen.equals(sb.startFen))throw new IOException("두 엔진의 초기 배치가 다릅니다");
-                main.post(()->{if(destroyed)return;variant=selected;variantStart=sa.startFen;
-                    initialFen=variantStart;moves.clear();cursor=0;networkBusy=false;persist();refresh(false);});
+            Engine nextRefA=null,nextRefB=null;
+            SearchEngine nextSearchA=null,nextSearchB=null;
+            try{
+                String exe=installEngineExecutable(),net=prefs.getString("nnuePath","");
+                nextRefA=new Engine(exe,selected);
+                nextRefA.useNetwork(EngineProfile.FAIRY.equals(profileA)?net:"");
+                nextRefB=new Engine(exe,selected);
+                nextRefB.useNetwork(EngineProfile.FAIRY.equals(profileB)?net:"");
+                Engine.State stA=nextRefA.state(),stB=nextRefB.state();
+                if(!stA.startFen.equals(stB.startFen))
+                    throw new IOException("두 판정 엔진의 초기 배치가 다릅니다");
+                nextSearchA=createSearchEngine(profileA,selected,net);
+                nextSearchB=createSearchEngine(profileB,selected,net);
+                synchronized(this){
+                    if(destroyed)throw new IOException("앱이 종료되었습니다");
+                    Engine oldA=a,oldB=b;
+                    SearchEngine oldSearchA=searchA,oldSearchB=searchB;
+                    a=nextRefA;b=nextRefB;searchA=nextSearchA;searchB=nextSearchB;
+                    nextRefA=null;nextRefB=null;nextSearchA=null;nextSearchB=null;
+                    engineAID=profileA;engineBID=profileB;
+                    if(oldA!=null)oldA.close();if(oldB!=null)oldB.close();
+                    if(oldSearchA!=null)oldSearchA.close();if(oldSearchB!=null)oldSearchB.close();
+                }
+                main.post(()->{
+                    if(destroyed)return;
+                    variant=selected;variantStart=stA.startFen;
+                    if(changedRules){initialFen=variantStart;moves.clear();cursor=0;}
+                    networkBusy=false;persist();refresh(false);
+                });
             }catch(Exception ex){
-                try { a.setVariant(previous);b.setVariant(previous); }
-                catch(Exception rollback){if(a!=null)a.close();if(b!=null)b.close();initialized=false;}
-                main.post(()->{if(destroyed)return;networkBusy=false;refresh(false);error(ex);});
+                main.post(()->{
+                    if(destroyed)return;
+                    networkBusy=false;
+                    if(initialized)refresh(false);
+                    new AlertDialog.Builder(this).setTitle("엔진 전환 실패")
+                        .setMessage("기존 엔진과 기보를 유지합니다.\n"+ex.getMessage())
+                        .setPositiveButton("확인",null).show();
+                });
+            }finally{
+                if(nextRefA!=null)nextRefA.close();if(nextRefB!=null)nextRefB.close();
+                if(nextSearchA!=null)nextSearchA.close();if(nextSearchB!=null)nextSearchB.close();
             }
         });
     }
@@ -354,9 +521,14 @@ public final class MainActivity extends Activity {
                     try(Cursor c=getContentResolver().query(uri,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null)){
                         if(c!=null&&c.moveToFirst())name=c.getString(0);
                     }
-                    // The engine selects a variant network by basename prefix.
-                    // Use a unique janggi-* filename: NNUE caches loaded paths.
-                    candidate=new File(getFilesDir(),"janggi-"+UUID.randomUUID()+".nnue");
+                    // Keep an official janggi-<hash>.nnue basename for engines that
+                    // select networks by filename. A unique directory avoids
+                    // stale NNUE caches without renaming model identities.
+                    String basename=name!=null&&name.matches("janggi-[a-zA-Z0-9_-]{4,64}\\.nnue")
+                        ?name:"janggi-imported.nnue";
+                    File networkDir=new File(getFilesDir(),"network-"+UUID.randomUUID());
+                    if(!networkDir.mkdir())throw new IOException("NNUE 저장 폴더 생성 실패");
+                    candidate=new File(networkDir,basename);
                     try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(candidate)){
                         if(in==null)throw new IOException("선택한 파일을 열 수 없습니다");
                         byte[] buf=new byte[65536];long total=0;int n;
@@ -372,12 +544,12 @@ public final class MainActivity extends Activity {
                 replaceEngines(installEngineExecutable(),path);
                 String previous=prefs.getString("nnuePath","");
                 prefs.edit().putString("nnuePath",path).putString("nnueName",name).apply();
-                if(!previous.isEmpty()&&!previous.equals(path))new File(previous).delete();
+                if(!previous.isEmpty()&&!previous.equals(path))deleteManagedNetwork(previous);
                 candidate=null;
                 final String selected=name;
                 main.post(()->{if(destroyed)return;networkBusy=false;networkName=selected;refresh(false);Toast.makeText(this,"평가 적용: "+selected,Toast.LENGTH_LONG).show();});
             } catch(Exception ex){
-                if(candidate!=null)candidate.delete();
+                if(candidate!=null)deleteManagedNetwork(candidate.getAbsolutePath());
                 main.post(()->{if(destroyed)return;networkBusy=false;refresh(false);new AlertDialog.Builder(this).setTitle("NNUE 적용 실패").setMessage("기존 평가를 유지합니다. Fairy-Stockfish 장기용 파일인지 확인하세요.\n"+ex.getMessage()).setPositiveButton("확인",null).show();});
             }
         });
@@ -388,6 +560,18 @@ public final class MainActivity extends Activity {
      * filesDir is not reliable on devices whose app-data mount is noexec and
      * results in error=13 (Permission denied).
      */
+    /** Do not delete an arbitrary file if preferences were modified externally. */
+    void deleteManagedNetwork(String path){
+        try{
+            File root=getFilesDir().getCanonicalFile(), target=new File(path).getCanonicalFile();
+            if(!target.getPath().startsWith(root.getPath()+File.separator))return;
+            if(target.isFile())target.delete();
+            File parent=target.getParentFile();
+            if(parent!=null&&parent.getParentFile()!=null
+               &&parent.getParentFile().equals(root)
+               &&parent.getName().startsWith("network-"))parent.delete();
+        }catch(IOException ignored){}
+    }
     String installEngineExecutable() throws IOException {
         File source=new File(getApplicationInfo().nativeLibraryDir,"libfairy.so");
         if(!source.isFile()||source.length()<4096)
@@ -396,9 +580,40 @@ public final class MainActivity extends Activity {
             throw new IOException("내장 엔진 실행 권한 없음: "+source);
         return source.getAbsolutePath();
     }
-    void licenses(){try{java.io.InputStream in=getAssets().open("COPYING");java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)out.write(buf,0,n);in.close();TextView t=text(out.toString("UTF-8"),12,0xff233F3A);t.setPadding(dp(16),dp(12),dp(16),dp(12));ScrollView s=new ScrollView(this);s.addView(t);new AlertDialog.Builder(this).setTitle("GNU GPL v3").setView(s).setPositiveButton("닫기",null).show();}catch(Exception e){error(e);}}
-    void share(){if(state==null)return;String content="[장기 연구실 / Fairy-Stockfish]\nVariant: "+variant+"\nInitial FEN: "+initialFen+"\nMoves: "+String.join(" ",moves)+"\nCursor: "+cursor+"\nCurrent FEN: "+state.fen+"\n";Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");i.putExtra(Intent.EXTRA_TEXT,content);startActivity(Intent.createChooser(i,"기보 공유"));}
+    void licenses(){
+        try{
+            StringBuilder content=new StringBuilder();
+            for(String asset:new String[]{"THIRD_PARTY_NOTICES.txt","COPYING","AGPL-3.0.txt"}){
+                content.append("=== ").append(asset).append(" ===\n");
+                try(InputStream in=getAssets().open(asset);
+                    ByteArrayOutputStream out=new ByteArrayOutputStream()){
+                    byte[] buf=new byte[4096];int n;
+                    while((n=in.read(buf))>0)out.write(buf,0,n);
+                    content.append(out.toString("UTF-8")).append("\n\n");
+                }
+            }
+            TextView t=text(content.toString(),12,0xff233F3A);
+            t.setPadding(dp(16),dp(12),dp(16),dp(12));
+            ScrollView scroll=new ScrollView(this);scroll.addView(t);
+            new AlertDialog.Builder(this).setTitle("오픈소스 라이선스")
+                .setView(scroll).setPositiveButton("닫기",null).show();
+        }catch(Exception e){error(e);}
+    }
+    void share(){
+        if(state==null)return;
+        String content="[장기 연구실 / Fairy-Stockfish 규칙 판정]\n"
+            +"Variant: "+variant+"\n"
+            +"Engine A: "+EngineProfile.title(engineAID)+"\n"
+            +"Engine B: "+EngineProfile.title(engineBID)+"\n"
+            +"Initial FEN: "+initialFen+"\n"
+            +"Moves: "+String.join(" ",moves)+"\n"
+            +"Cursor: "+cursor+"\n"
+            +"Current FEN: "+state.fen+"\n";
+        Intent intent=new Intent(Intent.ACTION_SEND);
+        intent.setType("text/plain");intent.putExtra(Intent.EXTRA_TEXT,content);
+        startActivity(Intent.createChooser(intent,"기보 공유"));
+    }
     @Override protected void onResume(){super.onResume();if(initialized)refresh(false);}
     @Override protected void onPause(){super.onPause();active=false;soundCursor=-1;cancel();if(sounds!=null)sounds.pause();persist();if(run!=null)run.setText(mode.equals("analysis")?"분석 시작":"대국 시작");}
-    @Override protected synchronized void onDestroy(){destroyed=true;cancel();if(sounds!=null)sounds.close();if(a!=null)a.close();if(b!=null)b.close();worker.shutdownNow();super.onDestroy();}
+    @Override protected synchronized void onDestroy(){destroyed=true;cancel();if(sounds!=null)sounds.close();if(a!=null)a.close();if(b!=null)b.close();if(searchA!=null)searchA.close();if(searchB!=null)searchB.close();worker.shutdownNow();super.onDestroy();}
 }

@@ -12,7 +12,7 @@ import java.util.concurrent.*;
 final class Engine {
     final Process process;
     private final BufferedWriter writer;
-    private final BlockingQueue<String> lines = new LinkedBlockingQueue<>();
+    private final BlockingQueue<String> lines = new ArrayBlockingQueue<>(8192);
     private volatile boolean closed;
     private volatile String lastLine = "";
     private int lastSkill=-1, lastThreads=-1, lastHash=-1, lastPv=-1;
@@ -44,8 +44,8 @@ final class Engine {
         writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), "UTF-8"));
         Thread reader = new Thread(() -> {
             try (BufferedReader r = new BufferedReader(new InputStreamReader(process.getInputStream(), "UTF-8"))) {
-                String s; while ((s = r.readLine()) != null) lines.offer(s);
-            } catch (IOException ignored) {} finally { lines.offer("__EOF__"); }
+                String s; while ((s = r.readLine()) != null) offer(s);
+            } catch (IOException ignored) {} finally { offer("__EOF__"); }
         }, "uci-reader");
         reader.setDaemon(true); reader.start();
         try {
@@ -58,6 +58,13 @@ final class Engine {
             send("setoption name Use NNUE value false");
             setVariant(variant);
         } catch (Exception ex) { close(); throw ex; }
+    }
+    private void offer(String message){
+        if(!lines.offer(message)){
+            // Discard stale analysis output before exhausting app memory.
+            lines.poll();
+            lines.offer(message);
+        }
     }
     /** Call on the controller's serial worker. stop() may be called from UI.
      * The response lock waits for an active search to consume its bestmove. */
@@ -91,12 +98,12 @@ final class Engine {
             if (left <= 0) throw new IOException("엔진 응답 시간 초과");
             String s = lines.poll(left, TimeUnit.NANOSECONDS);
             if (s == null) throw new IOException("엔진 응답 시간 초과");
-            lastLine=s;
             if (s.equals("__EOF__")) {
                 int code=-1;
                 try { code=process.exitValue(); } catch (IllegalThreadStateException ignored) {}
                 throw new IOException("엔진 프로세스가 종료되었습니다 (exit="+code+", last='"+lastLine+"')");
             }
+            lastLine=s;
             if (info != null) info.line(s);
             if (s.startsWith(prefix)) return s;
         }
