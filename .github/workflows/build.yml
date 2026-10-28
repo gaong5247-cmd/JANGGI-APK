@@ -1,7 +1,7 @@
 name: Verify and build Janggi Lab
 on:
   push:
-    branches: [main, 'codex/janggi-state-nnue']
+    branches: [main, 'codex/janggi-state-nnue', 'feature/engine-selector-crash-guard']
   pull_request:
   workflow_dispatch:
 permissions:
@@ -25,8 +25,9 @@ jobs:
           python3 tests/variant_regression.py native/Fairy-Stockfish/src/stockfish | tee build/variants.json
           python3 tests/engine_smoke.py native/Fairy-Stockfish/src/stockfish | tee build/smoke.json
           python3 tests/janggi_regression.py native/Fairy-Stockfish/src/stockfish | tee build/regression.json
-          javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java tests/EngineIntegration.java
+          javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java app/src/org/janggilab/EngineProfile.java app/src/org/janggilab/SearchEngine.java tests/EngineIntegration.java tests/SearchEngineIntegration.java
           java -cp build/classes org.janggilab.EngineIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" | tee build/java-results.txt
+          java -cp build/classes org.janggilab.SearchEngineIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" "$PWD/app/assets/janggilab-variants.ini" | tee build/search-engine-results.txt
       - name: Upstream engine checks
         working-directory: native/Fairy-Stockfish/src
         run: |
@@ -47,6 +48,35 @@ jobs:
           path: |
             build/*.json
             build/*.txt
+  stockless-host-protocol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare pinned Stockless Variants
+        run: |
+          mkdir -p build/stockless
+          git -C build/stockless init
+          git -C build/stockless remote add origin https://github.com/gaong5247-cmd/Stockless-variants.git
+          git -C build/stockless fetch --depth 1 origin 99067d0964e40285dd5c24de9c0ecb666dc31924
+          git -C build/stockless checkout --detach FETCH_HEAD
+          git -C build/stockless submodule update --init --depth 1
+          python3 build/stockless/tools/materialize.py
+      - name: Build external host search engine
+        run: make -C build/stockless/build/engine/src -j2 build ARCH=x86-64 largeboards=yes all=yes nnue=no EXE=stockless-variants
+      - name: Test four exact Janggi Lab variants and UCI adapter
+        run: |
+          mkdir -p build/java-ext
+          javac --release 8 -encoding UTF-8 -d build/java-ext app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java app/src/org/janggilab/EngineProfile.java app/src/org/janggilab/SearchEngine.java tests/SearchEngineIntegration.java
+          java -cp build/java-ext org.janggilab.SearchEngineIntegration build/stockless/build/engine/src/stockless-variants "$PWD/app/assets/janggilab-variants.ini" build/stockless/build/engine/src/stockless-variants | tee build/stockless-search-results.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stockless-host-logs
+          path: build/stockless-search-results.txt
   android:
     runs-on: ubuntu-latest
     steps:
@@ -57,6 +87,21 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v3
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+      - name: Build pinned Stockless Variants arm64 engine
+        run: |
+          mkdir -p build/stockless
+          git -C build/stockless init
+          git -C build/stockless remote add origin https://github.com/gaong5247-cmd/Stockless-variants.git
+          git -C build/stockless fetch --depth 1 origin 99067d0964e40285dd5c24de9c0ecb666dc31924
+          git -C build/stockless checkout --detach FETCH_HEAD
+          git -C build/stockless submodule update --init --depth 1
+          python3 build/stockless/tools/materialize.py
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
+          export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+          make -C build/stockless/build/engine/src -j2 build COMP=ndk ARCH=armv8 CXX=aarch64-linux-android26-clang++ largeboards=yes all=yes nnue=no EXE=stockless-variants EXTRALDFLAGS=-Wl,-z,max-page-size=16384
+          mkdir -p build/lib/arm64-v8a
+          cp build/stockless/build/engine/src/stockless-variants build/lib/arm64-v8a/libstockless.so
+          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" build/lib/arm64-v8a/libstockless.so
       - name: Build armv7, armv8, x86_64 and Universal APKs
         run: |
           export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
