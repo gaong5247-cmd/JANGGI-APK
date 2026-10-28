@@ -36,7 +36,7 @@ for name, abis in [(a, [a]) for a in expected] + [('universal', list(expected))]
                 if libname.startswith('libfairy'):
                     for variant in (b'janggitraditional',b'janggimodern',b'jangginopass',b'janggiblitz'):
                         assert b'['+variant+b':janggi]' in data, (abi,libname,variant)
-                assert data[:4] == b'\\x7fELF' and data[5] == 1
+                assert data[:4] == b'\x7fELF' and data[5] == 1
                 assert (data[4], int.from_bytes(data[18:20], 'little')) == expected[abi], member
                 with tempfile.TemporaryDirectory() as tmp:
                     f=Path(tmp)/"engine.so"
