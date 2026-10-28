@@ -60,7 +60,7 @@ for name, members in [(a, [a]) for a in abis] + [('universal', abis)]:
                 if not f.is_file():
                     continue
                 with f.open('rb') as source:
-                    if source.read(4) != b'\\x7fELF':
+                    if source.read(4) != b'\x7fELF':
                         raise ValueError(f'Not an ELF executable: {f}')
                 z.write(f, 'lib/' + abi + '/' + libname)
     run([bt / 'zipalign', '-f', '-P', '16', '4', unsigned, aligned])
