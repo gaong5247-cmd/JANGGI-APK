@@ -71,7 +71,7 @@ jobs:
         run: |
           mkdir -p build/java-ext
           javac --release 8 -encoding UTF-8 -d build/java-ext app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java app/src/org/janggilab/EngineProfile.java app/src/org/janggilab/SearchEngine.java tests/SearchEngineIntegration.java
-          java -cp build/java-ext org.janggilab.SearchEngineIntegration build/stockless/build/engine/src/stockless-variants "$PWD/app/assets/janggilab-variants.ini" build/stockless/build/engine/src/stockless-variants | tee build/stockless-search-results.txt
+          java -cp build/java-ext org.janggilab.SearchEngineIntegration SKIP "$PWD/app/assets/janggilab-variants.ini" "$PWD/build/stockless/build/engine/src/stockless-variants" | tee build/stockless-search-results.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
