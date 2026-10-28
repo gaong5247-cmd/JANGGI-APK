@@ -1,0 +1,19 @@
+# Third-party native search engines and licenses
+
+The Janggi Lab APK contains the Fairy-Stockfish referee engine (GPL-3.0-or-later).
+When available, the Android ARM64 build also packages the independent
+Stockless Variants search engine (AGPLv3); it is launched as a separate UCI
+process. The app does not copy the Stockless source into the Fairy referee.
+
+- Stockless Variants source: https://github.com/gaong5247-cmd/Stockless-variants
+- Pinned Stockless source commit: 99067d0964e40285dd5c24de9c0ecb666dc31924
+- Original Fairy-Stockfish: https://github.com/fairy-stockfish/Fairy-Stockfish
+- Stockless license text in this APK: AGPL-3.0.txt
+- Fairy-Stockfish license text in this APK: COPYING
+
+Optional user-supplied UCI engines retain their own applicable licenses;
+this application does not imply any endorsement or universal compatibility.
+
+No original FSF neural networks are bundled. Users import a file independently.
+For source redistribution, include the exact Stockless source revision,
+its submodule revisions, the generated C++ source and the build instructions.
