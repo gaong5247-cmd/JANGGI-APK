@@ -563,7 +563,25 @@ public final class MainActivity extends Activity {
             throw new IOException("내장 엔진 실행 권한 없음: "+source);
         return source.getAbsolutePath();
     }
-    void licenses(){try{java.io.InputStream in=getAssets().open("COPYING");java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)out.write(buf,0,n);in.close();TextView t=text(out.toString("UTF-8"),12,0xff233F3A);t.setPadding(dp(16),dp(12),dp(16),dp(12));ScrollView s=new ScrollView(this);s.addView(t);new AlertDialog.Builder(this).setTitle("GNU GPL v3").setView(s).setPositiveButton("닫기",null).show();}catch(Exception e){error(e);}}
+    void licenses(){
+        try{
+            StringBuilder content=new StringBuilder();
+            for(String asset:new String[]{"THIRD_PARTY_NOTICES.txt","COPYING","AGPL-3.0.txt"}){
+                content.append("=== ").append(asset).append(" ===\n");
+                try(InputStream in=getAssets().open(asset);
+                    ByteArrayOutputStream out=new ByteArrayOutputStream()){
+                    byte[] buf=new byte[4096];int n;
+                    while((n=in.read(buf))>0)out.write(buf,0,n);
+                    content.append(out.toString("UTF-8")).append("\n\n");
+                }
+            }
+            TextView t=text(content.toString(),12,0xff233F3A);
+            t.setPadding(dp(16),dp(12),dp(16),dp(12));
+            ScrollView scroll=new ScrollView(this);scroll.addView(t);
+            new AlertDialog.Builder(this).setTitle("오픈소스 라이선스")
+                .setView(scroll).setPositiveButton("닫기",null).show();
+        }catch(Exception e){error(e);}
+    }
     void share(){if(state==null)return;String content="[장기 연구실 / Fairy-Stockfish]\nVariant: "+variant+"\nInitial FEN: "+initialFen+"\nMoves: "+String.join(" ",moves)+"\nCursor: "+cursor+"\nCurrent FEN: "+state.fen+"\n";Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");i.putExtra(Intent.EXTRA_TEXT,content);startActivity(Intent.createChooser(i,"기보 공유"));}
     @Override protected void onResume(){super.onResume();if(initialized)refresh(false);}
     @Override protected void onPause(){super.onPause();active=false;soundCursor=-1;cancel();if(sounds!=null)sounds.pause();persist();if(run!=null)run.setText(mode.equals("analysis")?"분석 시작":"대국 시작");}
