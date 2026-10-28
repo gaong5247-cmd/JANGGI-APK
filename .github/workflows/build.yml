@@ -28,6 +28,8 @@ jobs:
           javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java app/src/org/janggilab/EngineProfile.java app/src/org/janggilab/SearchEngine.java tests/EngineIntegration.java tests/SearchEngineIntegration.java
           java -cp build/classes org.janggilab.EngineIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" | tee build/java-results.txt
           java -cp build/classes org.janggilab.SearchEngineIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" "$PWD/app/assets/janggilab-variants.ini" | tee build/search-engine-results.txt
+          chmod +x tests/fake_uci_engine.py
+          java -cp build/classes org.janggilab.SearchEngineIntegration SKIP "$PWD/app/assets/janggilab-variants.ini" SKIP "$PWD/tests/fake_uci_engine.py" | tee build/search-stress-results.txt
       - name: Upstream engine checks
         working-directory: native/Fairy-Stockfish/src
         run: |
