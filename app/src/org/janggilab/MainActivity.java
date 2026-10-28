@@ -521,9 +521,14 @@ public final class MainActivity extends Activity {
                     try(Cursor c=getContentResolver().query(uri,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null)){
                         if(c!=null&&c.moveToFirst())name=c.getString(0);
                     }
-                    // The engine selects a variant network by basename prefix.
-                    // Use a unique janggi-* filename: NNUE caches loaded paths.
-                    candidate=new File(getFilesDir(),"janggi-"+UUID.randomUUID()+".nnue");
+                    // Keep an official janggi-<hash>.nnue basename for engines that
+                    // select networks by filename. A unique directory avoids
+                    // stale NNUE caches without renaming model identities.
+                    String basename=name!=null&&name.matches("janggi-[a-zA-Z0-9_-]{4,64}\\.nnue")
+                        ?name:"janggi-imported.nnue";
+                    File networkDir=new File(getFilesDir(),"network-"+UUID.randomUUID());
+                    if(!networkDir.mkdir())throw new IOException("NNUE 저장 폴더 생성 실패");
+                    candidate=new File(networkDir,basename);
                     try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(candidate)){
                         if(in==null)throw new IOException("선택한 파일을 열 수 없습니다");
                         byte[] buf=new byte[65536];long total=0;int n;
@@ -539,12 +544,12 @@ public final class MainActivity extends Activity {
                 replaceEngines(installEngineExecutable(),path);
                 String previous=prefs.getString("nnuePath","");
                 prefs.edit().putString("nnuePath",path).putString("nnueName",name).apply();
-                if(!previous.isEmpty()&&!previous.equals(path))new File(previous).delete();
+                if(!previous.isEmpty()&&!previous.equals(path))deleteManagedNetwork(previous);
                 candidate=null;
                 final String selected=name;
                 main.post(()->{if(destroyed)return;networkBusy=false;networkName=selected;refresh(false);Toast.makeText(this,"평가 적용: "+selected,Toast.LENGTH_LONG).show();});
             } catch(Exception ex){
-                if(candidate!=null)candidate.delete();
+                if(candidate!=null)deleteManagedNetwork(candidate.getAbsolutePath());
                 main.post(()->{if(destroyed)return;networkBusy=false;refresh(false);new AlertDialog.Builder(this).setTitle("NNUE 적용 실패").setMessage("기존 평가를 유지합니다. Fairy-Stockfish 장기용 파일인지 확인하세요.\n"+ex.getMessage()).setPositiveButton("확인",null).show();});
             }
         });
@@ -555,6 +560,18 @@ public final class MainActivity extends Activity {
      * filesDir is not reliable on devices whose app-data mount is noexec and
      * results in error=13 (Permission denied).
      */
+    /** Do not delete an arbitrary file if preferences were modified externally. */
+    void deleteManagedNetwork(String path){
+        try{
+            File root=getFilesDir().getCanonicalFile(), target=new File(path).getCanonicalFile();
+            if(!target.getPath().startsWith(root.getPath()+File.separator))return;
+            if(target.isFile())target.delete();
+            File parent=target.getParentFile();
+            if(parent!=null&&parent.getParentFile()!=null
+               &&parent.getParentFile().equals(root)
+               &&parent.getName().startsWith("network-"))parent.delete();
+        }catch(IOException ignored){}
+    }
     String installEngineExecutable() throws IOException {
         File source=new File(getApplicationInfo().nativeLibraryDir,"libfairy.so");
         if(!source.isFile()||source.length()<4096)
