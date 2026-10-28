@@ -33,18 +33,27 @@ def copy_source(source, destination):
 
 for abi in abis:
     arch, compiler, comp = TARGETS[abi]
-    src = B / ('engine-' + abi)
-    # Always refresh sources; previous code silently reused stale engine sources.
-    shutil.copytree(P / 'native/Fairy-Stockfish/src', src, dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns('*.o', '*.tmp', 'stockfish*', '.depend'),
-                    copy_function=copy_source)
-    cxx = str(bin / compiler) if os.name != 'nt' else (bin / 'clang++.exe').as_posix() + ' --target=' + compiler[:-len('-clang++')]
-    subprocess.run([make, '-j' + str(min(4, os.cpu_count() or 2)), 'build',
-                    'ARCH=' + arch, 'COMP=' + comp, 'OS=Android', 'CXX=' + cxx,
-                    'largeboards=yes', 'nnue=no', 'EXTRACXXFLAGS=-fPIE',
-                    'EXTRALDFLAGS=-static-libstdc++ -pie -Wl,-z,max-page-size=16384'], cwd=src, check=True)
-    dest = B / 'lib' / abi / 'libfairy.so'
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src / 'stockfish', dest)
-    subprocess.run([str(bin / ('llvm-strip.exe' if os.name == 'nt' else 'llvm-strip')), str(dest)], check=True)
+    # A conservative armv8 executable is always packaged. The optional
+    # armv8.2 dotprod profile is a *separate* binary and never auto-executed
+    # on an unknown CPU (SIGILL would otherwise kill the native process).
+    for dotprod in ([False, True] if abi == 'arm64-v8a' else [False]):
+        suffix = '-dotprod' if dotprod else ''
+        src = B / ('engine-' + abi + suffix)
+        shutil.copytree(P / 'native/Fairy-Stockfish/src', src, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns('*.o', '*.tmp', 'stockfish*', '.depend'),
+                        copy_function=copy_source)
+        cxx = (str(bin / compiler) if os.name != 'nt'
+               else (bin / 'clang++.exe').as_posix() + ' --target=' + compiler[:-len('-clang++')])
+        flags = '-fPIE' + (' -march=armv8.2-a+dotprod' if dotprod else '')
+        subprocess.run([make, '-j' + str(min(4, os.cpu_count() or 2)), 'build',
+                        'ARCH=' + arch, 'COMP=' + comp, 'OS=Android', 'CXX=' + cxx,
+                        'largeboards=yes', 'nnue=no', 'EXTRACXXFLAGS=' + flags,
+                        'EXTRALDFLAGS=-static-libstdc++ -pie -Wl,-z,max-page-size=16384'],
+                       cwd=src, check=True)
+        libname = 'libfairy_dotprod.so' if dotprod else 'libfairy.so'
+        dest = B / 'lib' / abi / libname
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src / 'stockfish', dest)
+        subprocess.run([str(bin / ('llvm-strip.exe' if os.name == 'nt' else 'llvm-strip')),
+                        str(dest)], check=True)
 subprocess.run([sys.executable, str(P / 'scripts/package.py'), *abis], check=True)
