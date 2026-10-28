@@ -383,8 +383,8 @@ public final class MainActivity extends Activity {
         l.addView(isolation);
         Button choose=button("장기 NNUE 파일 선택",this::chooseNetwork);l.addView(choose);
         Button reset=button("기본 평가로 복구",()->changeNetwork(null));l.addView(reset);
-        TextView current=text("현재 평가: "+networkName+"\nFairy-Stockfish용 장기 .nnue 파일을 선택하세요. 파일은 앱 내부에 복사됩니다.",12,0xff425B54);l.addView(current);
-        TextView note=text("분석은 최대 강도 · 후보수 3개로 실행됩니다.\n화면을 떠나면 탐색은 멈추고 기보는 자동 저장됩니다.\n\nFairy-Stockfish / GPL-3.0-or-later\nNNUE 선택 가능 · 기본 가중치 미포함\n엔진 대결은 같은 엔진의 서로 다른 설정 간 대결입니다.",12,0xff425B54);l.addView(note);
+        TextView current=text("현재 평가: "+networkName+"\nFSF 및 호환 Stockless용 장기 .nnue 파일을 선택하세요. 적용 전 실제 엔진에서 로딩 여부를 검사합니다.",12,0xff425B54);l.addView(current);
+        TextView note=text("분석은 최대 강도 · 후보수 3개로 실행됩니다.\n화면을 떠나면 탐색은 멈추고 기보는 자동 저장됩니다.\n\nFairy-Stockfish / GPL-3.0-or-later\nNNUE 선택 가능 · 기본 가중치 미포함\n엔진 A/B를 독립적으로 선택할 수 있습니다. 규칙 판정은 Fairy-Stockfish가 유지합니다.",12,0xff425B54);l.addView(note);
         new AlertDialog.Builder(this).setTitle("연구실 설정").setView(scroll).setNegativeButton("취소",null).setNeutralButton("라이선스",(d,w)->licenses()).setPositiveButton("적용",(d,w)->{skillA=sa.getSelectedItemPosition();skillB=sb.getSelectedItemPosition();msA=times[ta.getSelectedItemPosition()];msB=times[tb.getSelectedItemPosition()];threads=new int[]{1,2,4}[th.getSelectedItemPosition()];hash=new int[]{16,32,64,128}[ha.getSelectedItemPosition()];humanWhite=side.getSelectedItemPosition()==0;sounds.enabled=soundToggle.isChecked();prefs.edit().putBoolean("sounds",sounds.enabled).apply();persist();String selected=VariantConfig.IDS[rules.getSelectedItemPosition()];
             String selectedA=EngineProfile.IDS[profileA.getSelectedItemPosition()];
             String selectedB=EngineProfile.IDS[profileB.getSelectedItemPosition()];
@@ -582,7 +582,20 @@ public final class MainActivity extends Activity {
                 .setView(scroll).setPositiveButton("닫기",null).show();
         }catch(Exception e){error(e);}
     }
-    void share(){if(state==null)return;String content="[장기 연구실 / Fairy-Stockfish]\nVariant: "+variant+"\nInitial FEN: "+initialFen+"\nMoves: "+String.join(" ",moves)+"\nCursor: "+cursor+"\nCurrent FEN: "+state.fen+"\n";Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");i.putExtra(Intent.EXTRA_TEXT,content);startActivity(Intent.createChooser(i,"기보 공유"));}
+    void share(){
+        if(state==null)return;
+        String content="[장기 연구실 / Fairy-Stockfish 규칙 판정]\n"
+            +"Variant: "+variant+"\n"
+            +"Engine A: "+EngineProfile.title(engineAID)+"\n"
+            +"Engine B: "+EngineProfile.title(engineBID)+"\n"
+            +"Initial FEN: "+initialFen+"\n"
+            +"Moves: "+String.join(" ",moves)+"\n"
+            +"Cursor: "+cursor+"\n"
+            +"Current FEN: "+state.fen+"\n";
+        Intent intent=new Intent(Intent.ACTION_SEND);
+        intent.setType("text/plain");intent.putExtra(Intent.EXTRA_TEXT,content);
+        startActivity(Intent.createChooser(intent,"기보 공유"));
+    }
     @Override protected void onResume(){super.onResume();if(initialized)refresh(false);}
     @Override protected void onPause(){super.onPause();active=false;soundCursor=-1;cancel();if(sounds!=null)sounds.pause();persist();if(run!=null)run.setText(mode.equals("analysis")?"분석 시작":"대국 시작");}
     @Override protected synchronized void onDestroy(){destroyed=true;cancel();if(sounds!=null)sounds.close();if(a!=null)a.close();if(b!=null)b.close();if(searchA!=null)searchA.close();if(searchB!=null)searchB.close();worker.shutdownNow();super.onDestroy();}
