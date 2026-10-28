@@ -412,8 +412,10 @@ public final class MainActivity extends Activity {
         Engine nextA=null,nextB=null;
         SearchEngine nextSearchA=null,nextSearchB=null;
         try{
-            nextA=new Engine(exe,variant);nextA.useNetwork(path);
-            nextB=new Engine(exe,variant);nextB.useNetwork(path);
+            nextA=new Engine(exe,variant);
+            nextA.useNetwork(EngineProfile.FAIRY.equals(engineAID)?path:"");
+            nextB=new Engine(exe,variant);
+            nextB.useNetwork(EngineProfile.FAIRY.equals(engineBID)?path:"");
             Engine.State stateA=nextA.state(),stateB=nextB.state();
             if(!stateA.startFen.equals(stateB.startFen))
                 throw new IOException("A/B 장기 규칙 초기 국면 불일치");
@@ -449,27 +451,32 @@ public final class MainActivity extends Activity {
               .setMessage(EngineProfile.title(profileB)+" 실행 파일이 없거나 CPU 지원을 확인하지 못했습니다.")
               .setPositiveButton("확인",null).show();return;
         }
-        final String previous=variant;
-        final boolean changedRules=!selected.equals(previous);
+        final boolean changedRules=!selected.equals(variant);
         active=false;cancel();networkBusy=true;state=null;soundCursor=-1;passButton.setEnabled(false);
         status.setText("장기 규칙 및 탐색 엔진 검증 중…");
         worker.execute(()->{
-            SearchEngine nextA=null,nextB=null;
-            boolean committed=false;
+            Engine nextRefA=null,nextRefB=null;
+            SearchEngine nextSearchA=null,nextSearchB=null;
             try{
-                Engine.State stA=a.setVariant(selected),stB=b.setVariant(selected);
+                String exe=installEngineExecutable(),net=prefs.getString("nnuePath","");
+                nextRefA=new Engine(exe,selected);
+                nextRefA.useNetwork(EngineProfile.FAIRY.equals(profileA)?net:"");
+                nextRefB=new Engine(exe,selected);
+                nextRefB.useNetwork(EngineProfile.FAIRY.equals(profileB)?net:"");
+                Engine.State stA=nextRefA.state(),stB=nextRefB.state();
                 if(!stA.startFen.equals(stB.startFen))
                     throw new IOException("두 판정 엔진의 초기 배치가 다릅니다");
-                String network=prefs.getString("nnuePath","");
-                nextA=createSearchEngine(profileA,selected,network);
-                nextB=createSearchEngine(profileB,selected,network);
+                nextSearchA=createSearchEngine(profileA,selected,net);
+                nextSearchB=createSearchEngine(profileB,selected,net);
                 synchronized(this){
                     if(destroyed)throw new IOException("앱이 종료되었습니다");
-                    SearchEngine oldA=searchA,oldB=searchB;
-                    searchA=nextA;searchB=nextB;nextA=null;nextB=null;
+                    Engine oldA=a,oldB=b;
+                    SearchEngine oldSearchA=searchA,oldSearchB=searchB;
+                    a=nextRefA;b=nextRefB;searchA=nextSearchA;searchB=nextSearchB;
+                    nextRefA=null;nextRefB=null;nextSearchA=null;nextSearchB=null;
                     engineAID=profileA;engineBID=profileB;
                     if(oldA!=null)oldA.close();if(oldB!=null)oldB.close();
-                    committed=true;
+                    if(oldSearchA!=null)oldSearchA.close();if(oldSearchB!=null)oldSearchB.close();
                 }
                 main.post(()->{
                     if(destroyed)return;
@@ -478,8 +485,6 @@ public final class MainActivity extends Activity {
                     networkBusy=false;persist();refresh(false);
                 });
             }catch(Exception ex){
-                if(!committed)try{a.setVariant(previous);b.setVariant(previous);}
-                    catch(Exception rollback){if(a!=null)a.close();if(b!=null)b.close();initialized=false;}
                 main.post(()->{
                     if(destroyed)return;
                     networkBusy=false;
@@ -489,7 +494,8 @@ public final class MainActivity extends Activity {
                         .setPositiveButton("확인",null).show();
                 });
             }finally{
-                if(nextA!=null)nextA.close();if(nextB!=null)nextB.close();
+                if(nextRefA!=null)nextRefA.close();if(nextRefB!=null)nextRefB.close();
+                if(nextSearchA!=null)nextSearchA.close();if(nextSearchB!=null)nextSearchB.close();
             }
         });
     }
