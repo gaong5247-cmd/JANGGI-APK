@@ -52,8 +52,17 @@ for name, members in [(a, [a]) for a in abis] + [('universal', abis)]:
         for f in sorted((B / 'dex').glob('*.dex')):
             z.write(f, f.name)
         for abi in members:
-            f = B / 'lib' / abi / 'libfairy.so'
-            z.write(f, 'lib/' + abi + '/libfairy.so')
+            for libname in ('libfairy.so', 'libfairy_dotprod.so',
+                            'libstockless.so', 'libcustom.so'):
+                f = B / 'lib' / abi / libname
+                if libname == 'libfairy.so' and not f.is_file():
+                    raise FileNotFoundError(f)
+                if not f.is_file():
+                    continue
+                with f.open('rb') as source:
+                    if source.read(4) != b'\\x7fELF':
+                        raise ValueError(f'Not an ELF executable: {f}')
+                z.write(f, 'lib/' + abi + '/' + libname)
     run([bt / 'zipalign', '-f', '-P', '16', '4', unsigned, aligned])
     run([bt / 'apksigner', 'sign', '--ks', key, '--ks-pass', 'pass:localbuild', '--out', output, aligned])
     run([bt / 'apksigner', 'verify', '--verbose', output])
