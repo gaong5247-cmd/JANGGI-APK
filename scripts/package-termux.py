@@ -96,6 +96,8 @@ def main() -> None:
     BUILD.mkdir(parents=True, exist_ok=True)
     DIST.mkdir(parents=True, exist_ok=True)
     engine_src = BUILD / "engine"
+    if engine_src.exists():
+        shutil.rmtree(engine_src)
     shutil.copytree(ROOT / "native/Fairy-Stockfish/src", engine_src, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns("*.o", "*.tmp", "stockfish", ".depend"))
     run(["make", "-j4", "build", "ARCH=armv8", "COMP=clang", "OS=Android", f"CXX={clang}",
@@ -103,6 +105,8 @@ def main() -> None:
          "EXTRALDFLAGS=-stdlib=libc++ -pie -Wl,-z,max-page-size=16384"], cwd=engine_src)
 
     dotprod_src = BUILD / "engine-dotprod"
+    if dotprod_src.exists():
+        shutil.rmtree(dotprod_src)
     shutil.copytree(ROOT / "native/Fairy-Stockfish/src", dotprod_src, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns("*.o", "*.tmp", "stockfish", ".depend"))
     run(["make", "-j4", "build", "ARCH=armv8", "COMP=clang", "OS=Android", f"CXX={clang}",
@@ -120,12 +124,18 @@ def main() -> None:
     # Data-directory extraction/import is not a reliable executable strategy.
     for envname, filename in (("STOCKLESS_ARM64_ELF", "libstockless.so"),
                               ("CUSTOM_ARM64_ELF", "libcustom.so")):
+        target = libdir / filename
+        target.unlink(missing_ok=True)
         incoming = os.environ.get(envname)
         if incoming:
             source = Path(incoming).expanduser()
-            if not source.is_file() or source.read_bytes()[:4] != b'\x7fELF':
+            if not source.is_file():
+                raise SystemExit(f"엔진 파일이 없습니다: {source}")
+            with source.open("rb") as stream:
+                magic=stream.read(4)
+            if magic != b'\x7fELF':
                 raise SystemExit(f"잘못된 ELF 파일: {source}")
-            shutil.copy2(source, libdir / filename)
+            shutil.copy2(source,target)
 
     classes = BUILD / "classes"
     dex = BUILD / "dex"
