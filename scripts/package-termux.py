@@ -102,11 +102,30 @@ def main() -> None:
          "largeboards=yes", "nnue=no", "EXTRACXXFLAGS=-fPIE -stdlib=libc++",
          "EXTRALDFLAGS=-stdlib=libc++ -pie -Wl,-z,max-page-size=16384"], cwd=engine_src)
 
+    dotprod_src = BUILD / "engine-dotprod"
+    shutil.copytree(ROOT / "native/Fairy-Stockfish/src", dotprod_src, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns("*.o", "*.tmp", "stockfish", ".depend"))
+    run(["make", "-j4", "build", "ARCH=armv8", "COMP=clang", "OS=Android", f"CXX={clang}",
+         "largeboards=yes", "nnue=no",
+         "EXTRACXXFLAGS=-fPIE -stdlib=libc++ -march=armv8.2-a+dotprod",
+         "EXTRALDFLAGS=-stdlib=libc++ -pie -Wl,-z,max-page-size=16384"], cwd=dotprod_src)
+
     libdir = BUILD / "lib" / "arm64-v8a"
     libdir.mkdir(parents=True, exist_ok=True)
     engine = libdir / "libfairy.so"
     shutil.copy2(engine_src / "stockfish", engine)
+    shutil.copy2(dotprod_src / "stockfish", libdir / "libfairy_dotprod.so")
     shutil.copy2(libcxx, libdir / "libc++_shared.so")
+    # A prebuilt Android ARM64 UCI engine can be baked into this APK.
+    # Data-directory extraction/import is not a reliable executable strategy.
+    for envname, filename in (("STOCKLESS_ARM64_ELF", "libstockless.so"),
+                              ("CUSTOM_ARM64_ELF", "libcustom.so")):
+        incoming = os.environ.get(envname)
+        if incoming:
+            source = Path(incoming).expanduser()
+            if not source.is_file() or source.read_bytes()[:4] != b'\x7fELF':
+                raise SystemExit(f"잘못된 ELF 파일: {source}")
+            shutil.copy2(source, libdir / filename)
 
     classes = BUILD / "classes"
     dex = BUILD / "dex"
@@ -132,6 +151,11 @@ def main() -> None:
         for item in sorted(dex.glob("*.dex")):
             archive.write(item, item.name)
         archive.write(engine, "lib/arm64-v8a/libfairy.so")
+        archive.write(libdir / "libfairy_dotprod.so", "lib/arm64-v8a/libfairy_dotprod.so")
+        for optional in ("libstockless.so", "libcustom.so"):
+            candidate = libdir / optional
+            if candidate.is_file():
+                archive.write(candidate, "lib/arm64-v8a/" + optional)
         archive.write(libcxx, "lib/arm64-v8a/libc++_shared.so")
 
     key = BUILD / "local-signing.p12"
