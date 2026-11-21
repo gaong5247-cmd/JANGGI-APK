@@ -39,6 +39,7 @@ public final class DesktopMain {
     private Engine.State current;
     private String variant=VariantConfig.IDS[0], variantStart=DesktopPosition.START;
     private String initialFen=DesktopPosition.START, exePath="", nnuePath="";
+    private String stagedNetworkPath="";
     private final List<String> moves=new ArrayList<>();
     private final String[] variations={"","",""};
     private int cursor,skillCho=20,skillHan=12,timeCho=1000,timeHan=1000;
@@ -69,7 +70,8 @@ public final class DesktopMain {
         variant=VariantConfig.saved(prefs.get("variant",variant));
         humanWhite=prefs.getBoolean("humanWhite",true);
         String defaultEngine=findDefaultEngine();
-        exePath=prefs.get("exePath",defaultEngine);
+        String remembered=prefs.get("exePath","");
+        exePath=(!remembered.isEmpty()&&Files.isRegularFile(Paths.get(remembered)))?remembered:defaultEngine;
         nnuePath=prefs.get("nnuePath","");
         skillCho=prefs.getInt("skillCho",20);skillHan=prefs.getInt("skillHan",12);
         timeCho=prefs.getInt("timeCho",1000);timeHan=prefs.getInt("timeHan",1000);
@@ -177,6 +179,11 @@ public final class DesktopMain {
             Path base=Paths.get(packaged).toAbsolutePath().getParent();
             paths.add(base.resolve("app").resolve(name));paths.add(base.resolve(name));
         }
+        try{
+            Path jarDir=Paths.get(DesktopMain.class.getProtectionDomain().getCodeSource()
+                .getLocation().toURI()).toAbsolutePath().getParent();
+            if(jarDir!=null)paths.add(jarDir.resolve(name));
+        }catch(Exception ignored){}
         paths.add(Paths.get(name));paths.add(Paths.get("dist",name));
         for(Path p:paths)if(Files.isRegularFile(p))return p.toAbsolutePath().toString();
         return "";
@@ -188,17 +195,38 @@ public final class DesktopMain {
     private void onUi(int id,Runnable action){
         SwingUtilities.invokeLater(()->{if(!closed&&generation.get()==id)action.run();});
     }
+    /** Engine NNUE routing requires a "janggi*" basename, regardless of source name. */
+    private static String stageNetwork(String source)throws IOException{
+        if(source==null||source.isEmpty())return "";
+        Path from=Paths.get(source);
+        if(!Files.isRegularFile(from)||!from.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".nnue"))
+            throw new IOException("NNUE 확장자의 정상 파일을 선택하세요");
+        long bytes=Files.size(from);
+        if(bytes==0||bytes>256L*1024*1024)throw new IOException("NNUE는 1~256 MB 파일이어야 합니다");
+        String local=System.getenv("LOCALAPPDATA");
+        Path dir=(local!=null&&!local.isEmpty()?Paths.get(local):Paths.get(System.getProperty("user.home")))
+                 .resolve("JanggiLab").resolve("networks");
+        Files.createDirectories(dir);
+        Path staged=dir.resolve("janggi-"+UUID.randomUUID()+".nnue");
+        Files.copy(from,staged);
+        return staged.toAbsolutePath().toString();
+    }
     private void loadEngines(String executable,String network,boolean reset){
         if(loading)return;
         running=false;int id=cancel();loading=true;status.setText("엔진 실행 및 4종 규칙 확인 중...");
         worker.execute(()->{
             Engine first=null,second=null;
+            String staged="";
             try{
-                first=new Engine(executable,variant);first.useNetwork(network);
-                second=new Engine(executable,variant);second.useNetwork(network);
+                staged=stageNetwork(network);
+                first=new Engine(executable,variant);first.useNetwork(staged);
+                second=new Engine(executable,variant);second.useNetwork(staged);
                 Engine.State st=first.state();
                 Engine oldA=a,oldB=b;a=first;b=second;first=null;second=null;
                 if(oldA!=null)oldA.close();if(oldB!=null)oldB.close();
+                String oldStaged=stagedNetworkPath;stagedNetworkPath=staged;
+                if(!oldStaged.isEmpty()&&!oldStaged.equals(staged))
+                    try{Files.deleteIfExists(Paths.get(oldStaged));}catch(IOException ignored){}
                 onUi(id,()->{
                     exePath=executable;nnuePath=network;
                     prefs.put("exePath",exePath);prefs.put("nnuePath",nnuePath);
@@ -210,6 +238,7 @@ public final class DesktopMain {
                 });
             }catch(Exception ex){
                 if(first!=null)first.close();if(second!=null)second.close();
+                if(!staged.isEmpty())try{Files.deleteIfExists(Paths.get(staged));}catch(IOException ignored){}
                 onUi(id,()->{loading=false;status.setText("엔진 로딩 실패: "+ex.getMessage());
                     JOptionPane.showMessageDialog(window,ex.getMessage(),"엔진 설정 오류",JOptionPane.ERROR_MESSAGE);});
             }
@@ -506,6 +535,8 @@ public final class DesktopMain {
         prefs.put("variant",variant);prefs.put("initialFen",initialFen);
         worker.shutdownNow();
         if(a!=null)a.close();if(b!=null)b.close();
+        if(!stagedNetworkPath.isEmpty())
+            try{Files.deleteIfExists(Paths.get(stagedNetworkPath));}catch(IOException ignored){}
         window.dispose();
     }
 
