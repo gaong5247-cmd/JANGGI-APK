@@ -407,11 +407,12 @@ public final class DesktopMain {
         JComboBox<String> palette=new JComboBox<>(labels);
         JComboBox<String> turnSide=new JComboBox<>(new String[]{"초 차례","한 차례"});
         turnSide.setSelectedIndex(edited.white?0:1);
+        final JButton[] orientationButtonLabel=new JButton[1];
         JButton orientation=button(preview.flipped?"한 관점 · 초로 뒤집기":"초 관점 · 한으로 뒤집기",()->{
             preview.flipped=!preview.flipped;preview.selected="";preview.repaint();
             orientationButtonLabel[0].setText(preview.flipped?"한 관점 · 초로 뒤집기":"초 관점 · 한으로 뒤집기");
         });
-        final JButton[] orientationButtonLabel={orientation};
+        orientationButtonLabel[0]=orientation;
         JPanel tools=new JPanel(new GridLayout(2,2,8,7));
         tools.add(palette);tools.add(turnSide);tools.add(orientation);
         tools.add(text("탭: 배치 / 드래그: 이동",12,new Color(40,65,62)));
