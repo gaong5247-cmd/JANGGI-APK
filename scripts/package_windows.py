@@ -7,6 +7,7 @@ built into dist/janggilab-engine-x86_64.exe.
 from pathlib import Path
 import shutil
 import subprocess
+import os
 
 ROOT=Path(__file__).resolve().parents[1]
 BUILD=ROOT/"build"
@@ -24,6 +25,15 @@ SOURCES=[
 def run(*args):
     print(" ".join(map(str,args)),flush=True)
     subprocess.run(list(map(str,args)),check=True,cwd=ROOT)
+
+def jdk(tool):
+    """GitHub Actions MSYS2 does not always inherit the setup-java PATH."""
+    home=os.environ.get("JAVA_HOME","")
+    if home:
+        executable=Path(home)/"bin"/(tool+".exe")
+        if executable.is_file():
+            return str(executable)
+    return tool
 def build():
     if not ENGINE.is_file():
         raise SystemExit("Missing Windows engine: "+str(ENGINE))
@@ -31,19 +41,19 @@ def build():
     shutil.rmtree(INPUT,ignore_errors=True)
     CLASSES.mkdir(parents=True)
     INPUT.mkdir(parents=True)
-    run("javac","--release","8","-encoding","UTF-8","-d",CLASSES,*SOURCES,
+    run(jdk("javac"),"--release","8","-encoding","UTF-8","-d",CLASSES,*SOURCES,
         ROOT/"tests/DesktopPositionTest.java")
-    run("java","-Djava.awt.headless=true","-cp",CLASSES,"org.janggilab.DesktopPositionTest")
+    run(jdk("java"),"-Djava.awt.headless=true","-cp",CLASSES,"org.janggilab.DesktopPositionTest")
     assets=ROOT/"app/assets/pieces"
     assets.mkdir(parents=True,exist_ok=True)
     jar=INPUT/"JanggiLab.jar"
-    run("jar","--create","--file",jar,"--main-class","org.janggilab.DesktopMain",
+    run(jdk("jar"),"--create","--file",jar,"--main-class","org.janggilab.DesktopMain",
         "-C",CLASSES,".","-C",ROOT/"app/assets","pieces")
     shutil.copy2(ENGINE,INPUT/ENGINE.name)
     shutil.copy2(ROOT/"app/assets/PIECE-CREDITS.md",INPUT/"PIECE-CREDITS.md")
     shutil.copy2(ROOT/"LICENSE",INPUT/"LICENSE.txt")
     shutil.rmtree(DIST/"JanggiLab",ignore_errors=True)
-    run("jpackage","--type","app-image","--name","JanggiLab",
+    run(jdk("jpackage"),"--type","app-image","--name","JanggiLab",
         "--app-version","1.3.0","--input",INPUT,"--dest",DIST,
         "--main-jar",jar.name,"--main-class","org.janggilab.DesktopMain",
         "--java-options","-Dfile.encoding=UTF-8")
