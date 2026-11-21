@@ -27,6 +27,8 @@ jobs:
           python3 tests/janggi_regression.py native/Fairy-Stockfish/src/stockfish | tee build/regression.json
           javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java tests/EngineIntegration.java
           java -cp build/classes org.janggilab.EngineIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" | tee build/java-results.txt
+          javac --release 8 -encoding UTF-8 -d build/classes desktop/DesktopPosition.java desktop/DesktopMain.java tests/DesktopPositionTest.java -cp build/classes
+          java -Djava.awt.headless=true -cp build/classes org.janggilab.DesktopPositionTest
       - name: Upstream engine checks
         working-directory: native/Fairy-Stockfish/src
         run: |
@@ -57,6 +59,8 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v3
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+      - name: Fetch public-domain Janggi piece pictures
+        run: python3 scripts/fetch_piece_assets.py --strict
       - name: Build armv7, armv8, x86_64 and Universal APKs
         run: |
           export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
@@ -79,6 +83,12 @@ jobs:
           msystem: MINGW64
           update: true
           install: make mingw-w64-x86_64-gcc mingw-w64-x86_64-python
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Fetch public-domain Janggi piece pictures
+        run: python scripts/fetch_piece_assets.py --strict
       - name: Build standalone x86_64 EXE
         run: |
           make -C native/Fairy-Stockfish/src -j4 build ARCH=x86-64 COMP=mingw largeboards=yes nnue=no EXTRALDFLAGS=-static
@@ -92,7 +102,13 @@ jobs:
           python tests/janggi_regression.py dist/janggilab-engine-x86_64.exe > dist/windows-regression.json
           cd dist
           sha256sum janggilab-engine-x86_64.exe > EXE-SHA256.txt
+      - name: Build Windows GUI and portable distribution
+        run: python scripts/package_windows.py
       - uses: actions/upload-artifact@v4
         with:
           name: JanggiLab-Windows-x86_64
-          path: dist/*
+          path: |
+            dist/janggilab-engine-x86_64.exe
+            dist/JanggiLab-Windows-x86_64.zip
+            dist/windows-*.json
+            dist/EXE-SHA256.txt
