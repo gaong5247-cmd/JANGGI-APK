@@ -40,6 +40,8 @@ def build():
     run("jar","--create","--file",jar,"--main-class","org.janggilab.DesktopMain",
         "-C",CLASSES,".","-C",ROOT/"app/assets","pieces")
     shutil.copy2(ENGINE,INPUT/ENGINE.name)
+    shutil.copy2(ROOT/"app/assets/PIECE-CREDITS.md",INPUT/"PIECE-CREDITS.md")
+    shutil.copy2(ROOT/"LICENSE",INPUT/"LICENSE.txt")
     shutil.rmtree(DIST/"JanggiLab",ignore_errors=True)
     run("jpackage","--type","app-image","--name","JanggiLab",
         "--app-version","1.3.0","--input",INPUT,"--dest",DIST,
