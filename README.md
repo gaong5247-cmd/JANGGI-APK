@@ -14,11 +14,11 @@ Windows 10/11에서는 GitHub Actions의 `JanggiLab-Windows-x86_64` 아티팩트
 - **장기 규칙**: 전통/현대/패스 없음/블리츠 선택 시 상세 규칙 설명을 함께 표시하고 엔진을 재설정합니다.
 - **NNUE 선택**: 선택한 외부 `.nnue`를 새 엔진 프로세스에서 검증하며, 실패하면 원래 엔진·평가 설정을 유지합니다. 내장 NNUE 가중치는 제공하지 않습니다.
 - **포지션 편집**: 초/한 관점을 전환하며 기물을 직접 배치하거나 이동·교환합니다. 보이는 칸을 엔진 UCI 좌표로 변환한 후 FEN에 저장하므로 뒤집힌 보드에서도 위치가 변하지 않습니다. 적용한 관점을 메인 장기판에서 유지합니다.
-- **한자 기물 그림**: Wikimedia Commons의 공개 도메인 장기 기물 PNG 14개를 오프라인에 포함해 사용합니다. 이는 **사진이 아닌 실제 장기알 모양의 삽화**입니다. 실물 촬영본을 사용하려면 **기물 사진 폴더** 메뉴에서 `K A B N R C P k a b n r c p`(각각 `.png`) 이름의 사진 컷아웃 14개가 들어 있는 폴더를 지정할 수 있습니다. 대문자는 초, 소문자는 한입니다.
+- **한자 기물 그림**: Kadagaden의 CC BY 4.0 목재형 한자 장기 기물 PNG 14개를 오프라인에 포함해 사용합니다. 이는 **실제 장기알의 목재 질감을 재현한 이미지이며, 실물 촬영 사진은 아닙니다**. 실물 촬영본을 사용하려면 **기물 사진 폴더** 메뉴에서 `K A B N R C P k a b n r c p`(각각 `.png`) 이름의 사진 컷아웃 14개가 들어 있는 폴더를 지정할 수 있습니다. 대문자는 초, 소문자는 한입니다.
 
-빌드: Windows JDK 17+를 준비하고 엔진을 `dist/janggilab-engine-x86_64.exe`로 빌드한 뒤 `python scripts/fetch_piece_assets.py`, `python scripts/package_windows.py`를 실행하세요. 자세한 검증은 `tests/DesktopPositionTest.java`와 `tests/EngineIntegration.java`를 참고하세요.
+빌드: GitHub Actions가 공개 저장소 `Kadagaden/chess-pieces`를 체크아웃하고 SVG를 PNG로 변환한 후 Windows/Android 빌드에 함께 제공합니다. Windows 로컬 빌드 시 JDK 17+와 `dist/janggilab-engine-x86_64.exe`를 준비하고, `build/piece-upstream/janggi_wooden`의 원본 SVG와 `rsvg-convert`를 설치한 후 `python scripts/fetch_piece_assets.py --strict`, `python scripts/package_windows.py`를 실행하세요. 자세한 검증은 `tests/DesktopPositionTest.java`와 `tests/EngineIntegration.java`를 참고하세요.
 
-기물 이미지 출처: Wikimedia Commons [Janggi pieces](https://commons.wikimedia.org/wiki/Category:Janggi_pieces), User:Yeo123, Public Domain (PD-self). 원본 이미지의 재배포·변경에 제약을 두지 않는 자료입니다.
+기물 이미지: [Kadagaden/chess-pieces](https://github.com/Kadagaden/chess-pieces/tree/master/janggi_wooden) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · 리사이즈 및 파일명 변환. 상세 저작자·변경·라이선스 표기: [PIECE-CREDITS.md](app/assets/PIECE-CREDITS.md).
 
 ## 설치와 사용
 
