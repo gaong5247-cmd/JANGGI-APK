@@ -99,7 +99,11 @@ public final class DesktopMain {
         board=new BoardSurface();
         board.model=position;
         board.onTap=this::tap;
-        board.onDrag=(from,to)->{if(current!=null&&current.canPlay(from+to))commit(from+to);};
+        board.onDrag=(from,to)->{
+            if(current==null||!current.ongoing()||mode.equals("arena")
+                    ||(mode.equals("play")&&current.white!=humanWhite))return;
+            if(current.canPlay(from+to))commit(from+to);
+        };
         board.flipped=!humanWhite;
         JPanel left=new JPanel(new BorderLayout(3,3));left.setBackground(BG);
         turn=text("엔진을 준비하는 중...",17,TEXT);turn.setBorder(BorderFactory.createEmptyBorder(0,12,2,0));
@@ -268,9 +272,13 @@ public final class DesktopMain {
                 if(id!=generation.get())return;
                 onUi(id,()->status.setText(isAnalysis?"분석 중 · 평가값은 현재 차례 기준":
                       (st.white?"초":"한")+" 엔진 탐색 중..."));
+                final long[] lastInfoTime={0};
                 String best=e.search(isAnalysis?600000:(st.white?timeCho:timeHan),
                     ()->id==generation.get(),line->{
                         if(line.startsWith("info ")&&line.contains(" pv ")){
+                            long now=System.nanoTime();
+                            if(now-lastInfoTime[0]<120_000_000L&&!line.contains("multipv 3"))return;
+                            lastInfoTime[0]=now;
                             onUi(id,()->showInfo(st,line));
                         }
                     });
