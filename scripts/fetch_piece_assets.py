@@ -1,54 +1,50 @@
 #!/usr/bin/env python3
-"""Download freely reusable, original Janggi piece pictures for offline GUIs.
+"""Rasterize 14 attribution-required wood-style Janggi piece images for offline use.
 
-Source: Wikimedia Commons, User:Yeo123, public domain (PD-self).
-https://commons.wikimedia.org/wiki/Category:Janggi_pieces
-Each image is a small drawing of a real-style octagonal Janggi piece with
-traditional Chinese characters. This is *not* a photograph.
+Source: Kadagaden/chess-pieces, janggi_wooden/*.svg
+Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
+Source and license links are recorded in app/assets/PIECE-CREDITS.md.
+
+For CI, check out Kadagaden/chess-pieces into build/piece-upstream and
+install librsvg2-bin (rsvg-convert). Output is bundled inside the APK/JAR.
+This avoids network access during packaging, image-host rate limiting,
+SVG rendering differences at runtime, and CJK glyph font dependencies.
 """
-import argparse
-import hashlib
 from pathlib import Path
-from urllib.parse import quote
-from urllib.request import Request, urlopen
+import argparse
+import shutil
+import subprocess
 
-DEST = Path(__file__).resolve().parents[1] / "app" / "assets" / "pieces"
-NAMES = {
-    "K": "Green King.png", "A": "Green Sa.png", "B": "Green Sang.png",
-    "N": "Green Ma.png", "R": "Green Cha.png", "C": "Green Po.png",
-    "P": "Green Zol.png", "k": "Red King.png", "a": "Red Sa.png",
-    "b": "Red Sang.png", "n": "Red Ma.png", "r": "Red Cha.png",
-    "c": "Red Po.png", "p": "Red Byung.png",
-}
+ROOT=Path(__file__).resolve().parents[1]
+SOURCE=ROOT/"build"/"piece-upstream"/"janggi_wooden"
+DEST=ROOT/"app"/"assets"/"pieces"
+KINDS={"K":"king","A":"advisor","B":"elephant","N":"horse",
+       "R":"chariot","C":"cannon","P":"pawn"}
 
-def url_for(title):
-    canonical = title.replace(" ", "_")
-    h = hashlib.md5(canonical.encode("utf-8")).hexdigest()
-    return f"https://upload.wikimedia.org/wikipedia/commons/{h[0]}/{h[:2]}/{quote(canonical)}"
-
-def fetch(strict=False):
-    DEST.mkdir(parents=True, exist_ok=True)
-    missing = []
-    for piece, name in NAMES.items():
-        path = DEST / (piece + ".png")
-        if path.exists() and path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"):
-            continue
-        try:
-            req = Request(url_for(name), headers={"User-Agent": "JanggiLab/1.3 (GPLv3; piece asset redistribution from Wikimedia Commons)"})
-            with urlopen(req, timeout=25) as response:
-                data = response.read(512 * 1024 + 1)
-            if len(data) < 100 or len(data) > 512 * 1024 or not data.startswith(b"\x89PNG\r\n\x1a\n"):
-                raise ValueError("Unexpected PNG asset")
-            path.write_bytes(data)
-            print(f"{piece}: {name} ({len(data)} bytes)")
-        except Exception as exc:
-            missing.append(name)
-            print(f"WARNING: {name}: {exc}")
+def build(strict=False):
+    DEST.mkdir(parents=True,exist_ok=True)
+    renderer=shutil.which("rsvg-convert")
+    missing=[]
+    for prefix,color in [("", "blue"),("red", "red")]:
+        for kind,name in KINDS.items():
+            letter=kind if color=="blue" else kind.lower()
+            src=SOURCE/(color+"_"+name+".svg")
+            out=DEST/(letter+".png")
+            if src.is_file() and renderer:
+                subprocess.run([renderer,"--width","220","--height","220",
+                                "--output",str(out),str(src)],check=True)
+            if not out.is_file() or not out.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"):
+                missing.append(str(src))
+                continue
+            print(f"{letter}: {out.stat().st_size} bytes",flush=True)
     if missing and strict:
-        raise SystemExit("Cannot bundle all 14 offline piece images: " + ", ".join(missing))
+        raise SystemExit("Missing wood-style Chinese-character piece sprites: "+
+                         ", ".join(missing)+"; install librsvg2-bin and check out "+str(SOURCE))
+    if missing:
+        print("WARNING: missing sprites; legacy hand-drawn CJK fallback remains active")
     return not missing
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--strict", action="store_true", help="Require all 14 piece assets for the release package")
-    fetch(parser.parse_args().strict)
+if __name__=="__main__":
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--strict",action="store_true")
+    build(parser.parse_args().strict)
