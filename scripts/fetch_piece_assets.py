@@ -31,13 +31,13 @@ def fetch(strict=False):
     missing = []
     for piece, name in NAMES.items():
         path = DEST / (piece + ".png")
-        if path.exists() and path.read_bytes().startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        if path.exists() and path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"):
             continue
         try:
             req = Request(url_for(name), headers={"User-Agent": "JanggiLab/1.3 (GPLv3; piece asset redistribution from Wikimedia Commons)"})
             with urlopen(req, timeout=25) as response:
                 data = response.read(512 * 1024 + 1)
-            if len(data) < 100 or len(data) > 512 * 1024 or not data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+            if len(data) < 100 or len(data) > 512 * 1024 or not data.startswith(b"\x89PNG\r\n\x1a\n"):
                 raise ValueError("Unexpected PNG asset")
             path.write_bytes(data)
             print(f"{piece}: {name} ({len(data)} bytes)")
