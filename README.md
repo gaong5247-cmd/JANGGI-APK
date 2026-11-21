@@ -1,10 +1,24 @@
-# 장기 연구실 1.2.0
+# 장기 연구실 1.3.0
 
-Android 8.0 이상용 오프라인 장기 앱. ARMv7/ARM64/x86_64 및 Universal APK 빌드 대상을 제공합니다.
+Android 8.0 이상 및 Windows 10/11용 오프라인 장기 분석 앱. Android ARMv7/ARM64/x86_64 APK와 Windows GUI 포터블 ZIP 빌드 대상을 제공합니다.
 
 장기 규칙 4종과 이동·잡기·장군 효과음을 지원합니다. 이전 버전 감사 기록은 [AUDIT.md](AUDIT.md)이며, 이번 변경은 아래 규칙·검증 설명을 기준으로 합니다.
 
 Termux에서 APK를 만들 때는 `python3 scripts/package-termux.py arm64-v8a`를 사용합니다. 이 경로는 전체 Android SDK/NDK, Gradle, Android Studio, NDK wrapper compiler를 요구하지 않습니다. Termux의 `clang++`, `javac`, `aapt2`, `d8`, `zipalign`, `apksigner`, `keytool`과 준비된 `android.jar`를 사용합니다. 현재 Termux 기기 자체가 ARM64이므로 이 경로는 ARM64 APK만 생성하며, `libc++_shared.so`도 APK에 함께 넣습니다. 앱은 Android가 추출한 native library 경로의 ELF를 비트 수에 맞는 시스템 linker로 실행합니다. 시작 실패 시 오류에 엔진 exit code와 마지막 출력이 표시됩니다.
+
+## Windows 데스크톱 GUI
+
+Windows 10/11에서는 GitHub Actions의 `JanggiLab-Windows-x86_64` 아티팩트에서 `JanggiLab-Windows-x86_64.zip`을 내려받아 압축을 풀고 `JanggiLab/JanggiLab.exe`를 실행합니다. Java 런타임이 GUI ZIP에 포함되어 별도로 설치할 필요가 없습니다. 동일한 폴더의 `app/janggilab-engine-x86_64.exe`가 기본 엔진이며, 우측 하단 **엔진 EXE 선택**에서 다른 호환 바이너리를 선택할 수 있습니다. 호환되는 JanggiLab `appstate` 및 `UCI_Variant` 프로토콜이 필요합니다.
+
+- **오른쪽 ENGINE 평가 패널**: 분석값(현재 둘 차례 기준), 최선수·후보 수순·탐색 깊이·NPS를 표시합니다. Android의 하단 평가 패널은 그대로 유지합니다.
+- **장기 규칙**: 전통/현대/패스 없음/블리츠 선택 시 상세 규칙 설명을 함께 표시하고 엔진을 재설정합니다.
+- **NNUE 선택**: 선택한 외부 `.nnue`를 새 엔진 프로세스에서 검증하며, 실패하면 원래 엔진·평가 설정을 유지합니다. 내장 NNUE 가중치는 제공하지 않습니다.
+- **포지션 편집**: 초/한 관점을 전환하며 기물을 직접 배치하거나 이동·교환합니다. 보이는 칸을 엔진 UCI 좌표로 변환한 후 FEN에 저장하므로 뒤집힌 보드에서도 위치가 변하지 않습니다. 적용한 관점을 메인 장기판에서 유지합니다.
+- **한자 기물 그림**: Wikimedia Commons의 공개 도메인 장기 기물 PNG 14개를 오프라인에 포함해 사용합니다. 이는 **사진이 아닌 실제 장기알 모양의 삽화**입니다. 실물 촬영본을 사용하려면 **기물 사진 폴더** 메뉴에서 `K A B N R C P k a b n r c p`(각각 `.png`) 이름의 사진 컷아웃 14개가 들어 있는 폴더를 지정할 수 있습니다. 대문자는 초, 소문자는 한입니다.
+
+빌드: Windows JDK 17+를 준비하고 엔진을 `dist/janggilab-engine-x86_64.exe`로 빌드한 뒤 `python scripts/fetch_piece_assets.py`, `python scripts/package_windows.py`를 실행하세요. 자세한 검증은 `tests/DesktopPositionTest.java`와 `tests/EngineIntegration.java`를 참고하세요.
+
+기물 이미지 출처: Wikimedia Commons [Janggi pieces](https://commons.wikimedia.org/wiki/Category:Janggi_pieces), User:Yeo123, Public Domain (PD-self). 원본 이미지의 재배포·변경에 제약을 두지 않는 자료입니다.
 
 ## 설치와 사용
 
@@ -29,7 +43,7 @@ Termux에서 APK를 만들 때는 `python3 scripts/package-termux.py arm64-v8a`�
 
 ## 장기 규칙 선택
 
-**설정 → 장기 규칙 → 적용**에서 선택합니다. 변경 시 진행 중 탐색을 중단하고 두 엔진 A/B에 같은 규칙을 적용한 후 새 대국으로 초기화합니다. 현재 기보는 지워지므로 필요하면 먼저 공유하세요. 선택과 기보는 SharedPreferences에 함께 저장되며 재실행 후 복원됩니다. `새 대국`은 선택한 규칙의 엔진 반환 `appstartfen`을 바탕으로 양측 마·상 차림을 적용합니다.
+Android에서는 **설정 → 장기 규칙 → 적용**, Windows에서는 화면 상단의 **규칙** 콤보박스에서 선택합니다. 변경 시 진행 중 탐색을 중단하고 두 엔진 A/B에 같은 규칙을 적용한 후 새 대국으로 초기화합니다. 현재 기보는 지워지므로 필요하면 먼저 공유하세요. 선택과 기보는 SharedPreferences에 함께 저장되며 재실행 후 복원됩니다. `새 대국`은 선택한 규칙의 엔진 반환 `appstartfen`을 바탕으로 양측 마·상 차림을 적용합니다.
 
 | Variant | 표시 이름 | 빅장 | 한 수 쉼 | 반복 | 점수 판정 |
 | --- | --- | --- | --- | --- | --- |
