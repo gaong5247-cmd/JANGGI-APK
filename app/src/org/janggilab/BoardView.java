@@ -20,7 +20,19 @@ final class BoardView extends View {
     Tap tap;
     Drag drag;
     String downSquare="";
-    BoardView(Context c) { super(c); setContentDescription("장기판. 기물을 선택하고 표시된 합법수 위치를 누르세요."); setLayerType(View.LAYER_TYPE_SOFTWARE,null); }
+    private final Map<Character,Bitmap> pieceImages=new HashMap<>();
+    BoardView(Context c) {
+        super(c);
+        setContentDescription("장기판. 기물을 선택하고 표시된 합법수 위치를 누르세요.");
+        setLayerType(View.LAYER_TYPE_SOFTWARE,null);
+        // Offline public-domain Janggi picture assets; traditional vector fallback.
+        for(char kind: "KABNRCPkabnrcp".toCharArray()) {
+            try(java.io.InputStream input=c.getAssets().open("pieces/"+kind+".png")){
+                Bitmap bitmap=BitmapFactory.decodeStream(input);
+                if(bitmap!=null)pieceImages.put(kind,bitmap);
+            } catch(java.io.IOException ignored) {}
+        }
+    }
     void fen(String fen) {
         for(char[] row:pieces) Arrays.fill(row,' ');
         String[] rows=fen.split(" ")[0].split("/");
@@ -82,15 +94,21 @@ final class BoardView extends View {
         for(int r=0;r<10;r++) for(int f=0;f<9;f++) {
             char ch=pieces[r][f]; if(ch==' ')continue;
             float xx=x(f), yy=y(r), rad=cell*(Character.toLowerCase(ch)=='k'?.43f:.38f);
-            color(0xffFFF5DC); p.setShadowLayer(2,0,2,0x554B3620);
-            Path path=new Path();
-            for(int k=0;k<8;k++) { double a=Math.PI/8+k*Math.PI/4; float px=xx+(float)Math.cos(a)*rad,py=yy+(float)Math.sin(a)*rad; if(k==0)path.moveTo(px,py);else path.lineTo(px,py); }
-            path.close(); c.drawPath(path,p);
-            color(Character.isUpperCase(ch)?0xff126C87:0xffBB403D); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(1.7f); c.drawPath(path,p); p.setStyle(Paint.Style.FILL);
-            String label="";
-            switch(Character.toLowerCase(ch)) {case 'k':label=Character.isUpperCase(ch)?"楚":"漢";break;case 'a':label="士";break;case 'b':case 'e':label="象";break;case 'n':label="馬";break;case 'r':label="車";break;case 'c':label="包";break;case 'p':label=Character.isUpperCase(ch)?"卒":"兵";break;}
-            p.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));p.setTextSize(cell*.48f);p.setTextAlign(Paint.Align.CENTER);
-            c.drawText(label,xx,yy-(p.ascent()+p.descent())/2,p);
+            Bitmap sprite=pieceImages.get(ch);
+            if(sprite!=null){
+                color(Color.WHITE);p.setFilterBitmap(true);
+                c.drawBitmap(sprite,null,new RectF(xx-cell*.54f,yy-cell*.49f,xx+cell*.54f,yy+cell*.49f),p);
+            } else {
+                color(0xffFFF5DC); p.setShadowLayer(2,0,2,0x554B3620);
+                Path path=new Path();
+                for(int k=0;k<8;k++) { double a=Math.PI/8+k*Math.PI/4; float px=xx+(float)Math.cos(a)*rad,py=yy+(float)Math.sin(a)*rad; if(k==0)path.moveTo(px,py);else path.lineTo(px,py); }
+                path.close(); c.drawPath(path,p);
+                color(Character.isUpperCase(ch)?0xff126C87:0xffBB403D); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(1.7f); c.drawPath(path,p); p.setStyle(Paint.Style.FILL);
+                String label="";
+                switch(Character.toLowerCase(ch)) {case 'k':label=Character.isUpperCase(ch)?"楚":"漢";break;case 'a':label="士";break;case 'b':case 'e':label="象";break;case 'n':label="馬";break;case 'r':label="車";break;case 'c':label="包";break;case 'p':label=Character.isUpperCase(ch)?"卒":"兵";break;}
+                p.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));p.setTextSize(cell*.48f);p.setTextAlign(Paint.Align.CENTER);
+                c.drawText(label,xx,yy-(p.ascent()+p.descent())/2,p);
+                }
             if(selected.equals(""+(char)('a'+f)+(r+1))) { color(0xffDF9D32); p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);c.drawCircle(xx,yy,rad+3,p); }
         }
         for(String sq:targets) { int[] a=parse(sq); if(a[0]<0)continue;color(0xaa156F5E);c.drawCircle(x(a[0]),y(a[1]),cell*.105f,p); }

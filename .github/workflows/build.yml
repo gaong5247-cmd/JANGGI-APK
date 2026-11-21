@@ -7,6 +7,25 @@ on:
 permissions:
   contents: read
 jobs:
+  piece-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Kadagaden/chess-pieces
+          ref: master
+          path: build/piece-upstream
+      - name: Install SVG rasterizer
+        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
+      - name: Render Chinese-character wooden Janggi pieces
+        run: python3 scripts/fetch_piece_assets.py --strict
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JanggiLab-Piece-Images
+          path: app/assets/pieces/*.png
+          if-no-files-found: error
+
   host-tests:
     runs-on: ubuntu-latest
     steps:
@@ -27,6 +46,8 @@ jobs:
           python3 tests/janggi_regression.py native/Fairy-Stockfish/src/stockfish | tee build/regression.json
           javac --release 8 -encoding UTF-8 -d build/classes app/src/org/janggilab/Engine.java app/src/org/janggilab/VariantConfig.java app/src/org/janggilab/AnalysisScore.java tests/EngineIntegration.java
           java -cp build/classes org.janggilab.EngineIntegration "$PWD/native/Fairy-Stockfish/src/stockfish" | tee build/java-results.txt
+          javac --release 8 -encoding UTF-8 -d build/classes desktop/DesktopPosition.java desktop/DesktopMain.java tests/DesktopPositionTest.java -cp build/classes
+          java -Djava.awt.headless=true -cp build/classes org.janggilab.DesktopPositionTest
       - name: Upstream engine checks
         working-directory: native/Fairy-Stockfish/src
         run: |
@@ -48,15 +69,28 @@ jobs:
             build/*.json
             build/*.txt
   android:
+    needs: piece-assets
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: JanggiLab-Piece-Images
+          path: app/assets/pieces
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+      # GitHub hosted Ubuntu runners already contain command-line SDK tools.
+      # setup-android@v3 currently tries to install the retired 'tools' package.
+      - name: Install Android platform, build tools and NDK
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          MANAGER="$(find "$SDK/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -1)"
+          test -n "$MANAGER"
+          yes | "$MANAGER" --licenses >/dev/null || true
+          "$MANAGER" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
       - name: Build armv7, armv8, x86_64 and Universal APKs
         run: |
           export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
@@ -68,17 +102,26 @@ jobs:
           name: JanggiLab-Android
           path: dist/*
   windows:
+    needs: piece-assets
     runs-on: windows-latest
     defaults:
       run:
         shell: msys2 {0}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: JanggiLab-Piece-Images
+          path: app/assets/pieces
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
           update: true
           install: make mingw-w64-x86_64-gcc mingw-w64-x86_64-python
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Build standalone x86_64 EXE
         run: |
           make -C native/Fairy-Stockfish/src -j4 build ARCH=x86-64 COMP=mingw largeboards=yes nnue=no EXTRALDFLAGS=-static
@@ -92,7 +135,13 @@ jobs:
           python tests/janggi_regression.py dist/janggilab-engine-x86_64.exe > dist/windows-regression.json
           cd dist
           sha256sum janggilab-engine-x86_64.exe > EXE-SHA256.txt
+      - name: Build Windows GUI and portable distribution
+        run: python scripts/package_windows.py
       - uses: actions/upload-artifact@v4
         with:
           name: JanggiLab-Windows-x86_64
-          path: dist/*
+          path: |
+            dist/janggilab-engine-x86_64.exe
+            dist/JanggiLab-Windows-x86_64.zip
+            dist/windows-*.json
+            dist/EXE-SHA256.txt

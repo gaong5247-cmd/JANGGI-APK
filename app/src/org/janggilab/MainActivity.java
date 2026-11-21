@@ -30,7 +30,7 @@ public final class MainActivity extends Activity {
     volatile boolean initialized, destroyed;
     Engine.State state;
     BoardView board;
-    TextView status, turn, eval, details, history, badge;
+    TextView status, turn, eval, details, history, badge, variantHelp;
     Button run, passButton;
     String variant=VariantConfig.IDS[0], variantStart=START;
     MoveSounds sounds;
@@ -93,6 +93,7 @@ public final class MainActivity extends Activity {
         LinearLayout heading=row();TextView title=text("장기 연구실",27,TEXT);title.setTypeface(null,Typeface.BOLD);heading.addView(title,new LinearLayout.LayoutParams(0,dp(45),1));
         Button settings=button("설정",()->settings());heading.addView(settings,new LinearLayout.LayoutParams(dp(64),dp(40)));root.addView(heading);
         badge=text("FAIRY-STOCKFISH  ·  OFFLINE",11,ACCENT);badge.setLetterSpacing(.12f);root.addView(badge);
+        variantHelp=text(VariantConfig.description(variant),11,MUTED);variantHelp.setPadding(dp(2),dp(5),0,dp(8));root.addView(variantHelp);
         LinearLayout tabs=row();String[] names={"분석","직접 대국","엔진 대결"};String[] ids={"analysis","play","arena"};
         for(int i=0;i<3;i++){final String id=ids[i];modes[i]=button(names[i],()->{mode=id;active=false;updateModes();refresh(false);});addButton(tabs,modes[i]);}root.addView(tabs);updateModes();
         turn=text("엔진을 준비하고 있습니다",16,TEXT);turn.setPadding(dp(3),dp(10),0,dp(8));root.addView(turn);
@@ -156,6 +157,7 @@ public final class MainActivity extends Activity {
         passButton.setEnabled(VariantConfig.allowsPass(variant)&&st.ongoing()&&!mode.equals("arena")
             &&(!mode.equals("play")||st.white==humanWhite)&&st.legal.stream().anyMatch(m->{String[] q=BoardView.splitMove(m);return q!=null&&q[0].equals(q[1]);}));
         badge.setText("FAIRY-STOCKFISH · "+VariantConfig.NAMES[VariantConfig.index(variant)]);
+        variantHelp.setText(VariantConfig.description(variant));
         board.fen(st.fen);board.last=cursor>0?moves.get(cursor-1):"";board.invalidate();
         String side=st.white?"초":"한";
         turn.setText(side+" 차례"+(st.check?" · 장군":" · 장군 아님")+(VariantConfig.hasBikjang(variant)&&st.bikjang?" · 빅장 제안":"")+"     "+cursor+"수");
@@ -231,8 +233,17 @@ public final class MainActivity extends Activity {
         active=false;soundCursor=-1;cancel();
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(10),0,dp(10),dp(6));
         BoardView edit=new BoardView(this);edit.fen(displayedFen.isEmpty()?initialFen:displayedFen);
+        // Keep the current on-screen perspective: clicks still map to engine coordinates.
+        edit.flipped=board.flipped;
         int size=Math.min(getResources().getDisplayMetrics().widthPixels-dp(44),dp(430));
         body.addView(edit,new LinearLayout.LayoutParams(-1,size));
+        final Button[] perspectiveLabel=new Button[1];
+        Button perspective=button(edit.flipped?"한 관점에서 편집 · 초로 전환":"초 관점에서 편집 · 한으로 전환",()->{
+            edit.flipped=!edit.flipped;edit.selected="";edit.targets.clear();edit.invalidate();
+            perspectiveLabel[0].setText(edit.flipped?"한 관점에서 편집 · 초로 전환":"초 관점에서 편집 · 한으로 전환");
+        });
+        perspectiveLabel[0]=perspective;
+        body.addView(perspective,new LinearLayout.LayoutParams(-1,dp(44)));
         TextView help=text("기물을 터치한 뒤 다른 칸을 누르거나 드래그하세요. 다른 기물이 있으면 서로 자리를 바꿉니다. 팔레트는 추가/삭제용입니다.",11,0xff425B54);help.setPadding(dp(2),dp(5),dp(2),dp(3));body.addView(help);
         HorizontalScrollView paletteScroll=new HorizontalScrollView(this);LinearLayout palette=row();palette.setPadding(0,dp(2),0,dp(2));paletteScroll.addView(palette);body.addView(paletteScroll,new LinearLayout.LayoutParams(-1,dp(54)));
         // '?' means normal move/swap mode; a palette choice temporarily
@@ -258,9 +269,9 @@ public final class MainActivity extends Activity {
             char moving=edit.piece(from),target=edit.piece(to);
             edit.setPiece(from,target);edit.setPiece(to,moving);edit.selected="";edit.invalidate();
         };
-        Spinner side=spinner(new String[]{"초 차례","한 차례"},initialFen.contains(" b ")?1:0);label(body,"편집 후 둘 차례",side);
+        Spinner side=spinner(new String[]{"초 차례","한 차례"},(displayedFen.isEmpty()?initialFen:displayedFen).contains(" b ")?1:0);label(body,"편집 후 둘 차례",side);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("포지션 편집 · 자유 배치").setView(body).setNegativeButton("취소",null).setPositiveButton("적용",null).create();
-        dialog.setOnShowListener(d->{dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String problem=validateEditedPosition(edit);if(problem!=null){Toast.makeText(this,problem,Toast.LENGTH_LONG).show();return;}initialFen=edit.toFen(side.getSelectedItemPosition()==0);moves.clear();cursor=0;displayedFen="";state=null;dialog.dismiss();refresh(false);});});
+        dialog.setOnShowListener(d->{dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String problem=validateEditedPosition(edit);if(problem!=null){Toast.makeText(this,problem,Toast.LENGTH_LONG).show();return;}initialFen=edit.toFen(side.getSelectedItemPosition()==0);board.flipped=edit.flipped;moves.clear();cursor=0;displayedFen="";state=null;dialog.dismiss();refresh(false);});});
         dialog.show();
     }
     Spinner spinner(String[] options,int selected){Spinner s=new Spinner(this);ArrayAdapter<String> ad=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,options);s.setAdapter(ad);s.setSelection(selected);return s;}
@@ -288,6 +299,12 @@ public final class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);LinearLayout l=new LinearLayout(this);l.setPadding(dp(20),0,dp(20),dp(10));l.setOrientation(1);scroll.addView(l);
         Spinner rules=spinner(VariantConfig.NAMES,VariantConfig.index(variant));
         label(l,"장기 규칙 · 변경하면 현재 기보가 초기화됩니다",rules);
+        TextView ruleInfo=text(VariantConfig.DESCRIPTIONS[rules.getSelectedItemPosition()],12,0xff425B54);
+        ruleInfo.setPadding(dp(3),dp(4),dp(3),dp(12));l.addView(ruleInfo);
+        rules.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+            public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){ruleInfo.setText(VariantConfig.DESCRIPTIONS[position]);}
+            public void onNothingSelected(android.widget.AdapterView<?> parent){}
+        });
         CheckBox soundToggle=new CheckBox(this);soundToggle.setText("기물 이동 · 잡기 · 장군 효과음");soundToggle.setChecked(sounds.enabled);l.addView(soundToggle);
         String[] skills=new String[21];for(int i=0;i<21;i++)skills[i]="레벨 "+i+(i==20?" · 최대":"");
         Spinner sa=spinner(skills,skillA),sb=spinner(skills,skillB);
