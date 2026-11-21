@@ -7,6 +7,25 @@ on:
 permissions:
   contents: read
 jobs:
+  piece-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Kadagaden/chess-pieces
+          ref: master
+          path: build/piece-upstream
+      - name: Install SVG rasterizer
+        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
+      - name: Render Chinese-character wooden Janggi pieces
+        run: python3 scripts/fetch_piece_assets.py --strict
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JanggiLab-Piece-Images
+          path: app/assets/pieces/*.png
+          if-no-files-found: error
+
   host-tests:
     runs-on: ubuntu-latest
     steps:
@@ -50,9 +69,14 @@ jobs:
             build/*.json
             build/*.txt
   android:
+    needs: piece-assets
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: JanggiLab-Piece-Images
+          path: app/assets/pieces
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -67,8 +91,6 @@ jobs:
           test -n "$MANAGER"
           yes | "$MANAGER" --licenses >/dev/null || true
           "$MANAGER" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
-      - name: Fetch public-domain Janggi piece pictures
-        run: python3 scripts/fetch_piece_assets.py --strict
       - name: Build armv7, armv8, x86_64 and Universal APKs
         run: |
           export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
@@ -80,12 +102,17 @@ jobs:
           name: JanggiLab-Android
           path: dist/*
   windows:
+    needs: piece-assets
     runs-on: windows-latest
     defaults:
       run:
         shell: msys2 {0}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: JanggiLab-Piece-Images
+          path: app/assets/pieces
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -95,8 +122,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Fetch public-domain Janggi piece pictures
-        run: python scripts/fetch_piece_assets.py --strict
       - name: Build standalone x86_64 EXE
         run: |
           make -C native/Fairy-Stockfish/src -j4 build ARCH=x86-64 COMP=mingw largeboards=yes nnue=no EXTRALDFLAGS=-static
